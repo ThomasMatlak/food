@@ -1,14 +1,31 @@
 package main
 
 import (
-    "fmt"
-    "net/http"
+	"fmt"
+	"net/http"
+
+	"github.com/ThomasMatlak/food/controller"
+	"github.com/gorilla/mux"
 )
 
 func main() {
-    http.HandleFunc("/", func (w http.ResponseWriter, r *http.Request) {
-        fmt.Fprintf(w, "Hello World!")
-    })
+	router := mux.NewRouter().StrictSlash(true)
 
-    http.ListenAndServe(":8080", nil)
+	controller.RecipeRoutes(router)
+
+	router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+		pathTemplate, err := route.GetPathTemplate()
+		if err == nil {
+			fmt.Println(pathTemplate)
+		}
+
+		methods, err := route.GetMethods()
+		if err == nil {
+			fmt.Println(methods)
+		}
+
+		return nil
+	})
+
+	http.ListenAndServe(":8080", router)
 }
