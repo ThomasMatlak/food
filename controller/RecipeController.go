@@ -20,8 +20,14 @@ func getRecipe(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	var recipe model.Recipe
-	recipe.Id = id
+	recipe, err := repository.GetRecipe(id)
+	if err != nil && err.Error() == "Result contains no more records" {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 
 	json.NewEncoder(w).Encode(recipe)
 }
@@ -100,7 +106,16 @@ func deleteRecipe(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	deletedId, err := repository.DeleteRecipe(id)
+	recipe, err := repository.GetRecipe(id)
+	if err != nil && err.Error() == "Result contains no more records" {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	deletedId, err := repository.DeleteRecipe(recipe.Id)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
