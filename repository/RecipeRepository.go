@@ -10,8 +10,9 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
+var dbUri string = "bolt://localhost:7687" // todo get from configuration
+
 func CreateRecipe(recipe model.Recipe) (*model.Recipe, error) {
-	dbUri := "bolt://localhost:7687"                                 // todo get from configuration
 	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth()) // todo implement auth
 	if err != nil {
 		panic(err)
@@ -27,13 +28,13 @@ func CreateRecipe(recipe model.Recipe) (*model.Recipe, error) {
 		// todo different id function?
 		query := "CREATE (r:Recipe) SET r.id = toString(id(r)), r.title = $title, r.steps = $steps, r.created = $created\n" +
 			"RETURN r"
-		parameters := map[string]any{
+		params := map[string]any{
 			"title":   recipe.Title,
 			"steps":   recipe.Steps,
 			"created": neo4j.LocalDateTime(*recipe.Created),
 		}
 
-		records, err := tx.Run(ctx, query, parameters)
+		records, err := tx.Run(ctx, query, params)
 		if err != nil {
 			return nil, err
 		}
@@ -86,8 +87,48 @@ func CreateRecipe(recipe model.Recipe) (*model.Recipe, error) {
 // 	query := "MERGE (r:Recipe {id: $id}) SET r.title = $title, r.steps = $steps"
 // }
 
-// func Delete(id string) (string, error) {
-// 	query := "DETACH DELETE (r:Recipe) WHERE r.id= $id"
+func DeleteRecipe(id string) (string, error) {
+	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth()) // todo implement auth
+	if err != nil {
+		panic(err)
+	}
 
-// 	return id, nil
-// }
+	ctx := context.Background()
+	defer driver.Close(ctx)
+
+	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(ctx)
+
+	return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
+		query := "MATCH (r:Recipe {id: $id}) SET r.deleted = $deleted\n" +
+			"RETURN r"
+		params := map[string]any{
+			"id":      id,
+			"deleted": neo4j.LocalDateTime(time.Now()),
+		}
+
+		records, err := tx.Run(ctx, query, params)
+		if err != nil {
+			return "", err
+		}
+
+		record, err := records.Single(ctx)
+		if err != nil {
+			return "", err
+		}
+
+		rawNode, found := record.Get("r")
+		if !found {
+			return "", fmt.Errorf("could not find column")
+		}
+
+		node := rawNode.(neo4j.Node)
+
+		deletedId, err := neo4j.GetProperty[string](node, "id")
+		if err != nil {
+			return "", err
+		}
+
+		return deletedId, nil
+	})
+}

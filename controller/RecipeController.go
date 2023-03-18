@@ -40,7 +40,6 @@ func createRecipe(w http.ResponseWriter, r *http.Request) {
 	*newRecipe.Created = time.Now()
 
 	recipe, err := repository.CreateRecipe(newRecipe)
-
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -101,8 +100,14 @@ func deleteRecipe(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
+	deletedId, err := repository.DeleteRecipe(id)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
 	var deleteRecipeResponse response.DeleteRecipeResponse
-	deleteRecipeResponse.Id = id
+	deleteRecipeResponse.Id = deletedId
 
 	json.NewEncoder(w).Encode(deleteRecipeResponse)
 }
