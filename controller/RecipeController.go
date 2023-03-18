@@ -8,6 +8,7 @@ import (
 	"github.com/ThomasMatlak/food/controller/request"
 	"github.com/ThomasMatlak/food/controller/response"
 	"github.com/ThomasMatlak/food/model"
+	"github.com/ThomasMatlak/food/repository"
 	"github.com/gorilla/mux"
 )
 
@@ -29,14 +30,21 @@ func createRecipe(w http.ResponseWriter, r *http.Request) {
 	var createRecipeRequest request.CreateRecipeRequest
 	json.NewDecoder(r.Body).Decode(&createRecipeRequest)
 
-	var recipe model.Recipe
+	var newRecipe model.Recipe
 
-	recipe.Title = createRecipeRequest.Title
-	recipe.IngredientIds = createRecipeRequest.IngredientIds
-	recipe.Steps = createRecipeRequest.Steps
+	newRecipe.Title = createRecipeRequest.Title
+	newRecipe.IngredientIds = createRecipeRequest.IngredientIds
+	newRecipe.Steps = createRecipeRequest.Steps
 
-	recipe.Created = new(time.Time)
-	*recipe.Created = time.Now()
+	newRecipe.Created = new(time.Time)
+	*newRecipe.Created = time.Now()
+
+	recipe, err := repository.CreateRecipe(newRecipe)
+
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 
 	json.NewEncoder(w).Encode(recipe)
 }
