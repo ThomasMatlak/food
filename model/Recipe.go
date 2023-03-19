@@ -13,7 +13,7 @@ type Recipe struct {
 
 type RecipeRepository interface {
 	GetAll() ([]Recipe, error)
-	GetById(id string) (*Recipe, error)
+	GetById(id string) (*Recipe, bool, error)
 	Create(recipe Recipe) (*Recipe, error)
 	Update(recipe Recipe) (*Recipe, error)
 	Delete(id string) (string, error)

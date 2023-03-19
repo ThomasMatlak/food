@@ -12,8 +12,8 @@ import (
 )
 
 func main() {
-	dbUri := "bolt://localhost:7687"                                 // todo get from configuration
-	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth()) // todo implement auth
+	dbUri := "bolt://localhost:7687"                                 // TODO get from configuration
+	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth()) // TODO implement auth
 	if err != nil {
 		panic(err)
 	}
@@ -24,9 +24,13 @@ func main() {
 	recipeRepository := repository.NewRecipeRepository(ctx, driver)
 	recipeController := controller.NewRecipeController(recipeRepository)
 
+	ingredientRepository := repository.NewIngredientRepository(ctx, driver)
+	ingredientController := controller.NewIngredientController(ingredientRepository)
+
 	router := mux.NewRouter().StrictSlash(true)
 
 	recipeController.RecipeRoutes(router)
+	ingredientController.IngredientRoutes(router)
 
 	router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
 		pathTemplate, err := route.GetPathTemplate()
