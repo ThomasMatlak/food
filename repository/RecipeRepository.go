@@ -26,8 +26,9 @@ func (r *RecipeRepository) GetAll() ([]model.Recipe, error) {
 	defer session.Close(r.ctx)
 
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Recipe, error) {
-		query := "MATCH (r:Recipe) WHERE r.deleted IS NULL\n" +
-			"RETURN r"
+		query := fmt.Sprintf("MATCH (r:`%s`) WHERE r.deleted IS NULL\n"+
+			"RETURN r",
+			RecipeLabel)
 		params := map[string]any{}
 
 		result, err := tx.Run(r.ctx, query, params)
@@ -67,7 +68,7 @@ func (r *RecipeRepository) GetById(id string) (*model.Recipe, error) {
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 		query := fmt.Sprintf("%s WHERE r.deleted IS NULL\n"+
 			"RETURN r",
-			matchRecipeById)
+			MatchLabelById("r", []string{RecipeLabel}))
 		params := map[string]any{
 			"id": id,
 		}
@@ -96,9 +97,10 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 	defer session.Close(r.ctx)
 
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
-		// todo different id function?
-		query := "CREATE (r:Recipe) SET r.id = toString(id(r)), r.title = $title, description = $description, r.steps = $steps, r.created = $created\n" +
-			"RETURN r"
+		// TODO different id function?
+		query := fmt.Sprintf("CREATE (r:`%s`:`%s`) SET r.id = toString(id(r)), r.title = $title, description = $description, r.steps = $steps, r.created = $created\n"+
+			"RETURN r",
+			RecipeLabel, ResourceLabel)
 		params := map[string]any{
 			"title":       recipe.Title,
 			"description": recipe.Description,
@@ -132,7 +134,7 @@ func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 		query := fmt.Sprintf("%s SET r.title = $title, description = $description, r.steps = $steps, r.lastModified = $lastModified\n"+
 			"RETURN r",
-			matchRecipeById)
+			MatchLabelById("r", []string{RecipeLabel}))
 		params := map[string]any{
 			"id":           recipe.Id,
 			"description":  recipe.Description,
@@ -167,7 +169,7 @@ func (r *RecipeRepository) Delete(id string) (string, error) {
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
 		query := fmt.Sprintf("%s SET r.deleted = $deleted\n"+
 			"RETURN r.id AS id",
-			matchRecipeById)
+			MatchLabelById("r", []string{RecipeLabel}))
 		params := map[string]any{
 			"id":      id,
 			"deleted": neo4j.LocalDateTime(time.Now()),
@@ -191,8 +193,6 @@ func (r *RecipeRepository) Delete(id string) (string, error) {
 		return deletedId, nil
 	})
 }
-
-var matchRecipeById string = "MATCH (r:Recipe {id: $id})"
 
 func ParseRecipeNode(node dbtype.Node) (*model.Recipe, error) {
 	id, err := neo4j.GetProperty[string](node, "id")
@@ -234,5 +234,5 @@ func ParseRecipeNode(node dbtype.Node) (*model.Recipe, error) {
 		*lastModified = rawLastModified.Time()
 	}
 
-	return &model.Recipe{Id: id, Title: title, Description: description, Steps: steps, Created: created, LastModified: lastModified}, nil
+	return &model.Recipe{Id: id, Title: title, Description: description, Steps: steps, Resource: model.Resource{Created: created, LastModified: lastModified}}, nil
 }
