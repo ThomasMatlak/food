@@ -21,7 +21,7 @@ func getRecipe(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	recipe, err := repository.GetRecipe(id)
-	if err != nil && err.Error() == "Result contains no more records" {
+	if err != nil && err.Error() == "Result contains no more records" { // todo is there a better way to do this?
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	} else if err != nil {
@@ -58,11 +58,17 @@ func replaceRecipe(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
+	recipe, err := repository.GetRecipe(id)
+	if err != nil && err.Error() == "Result contains no more records" {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
 	var replaceRecipeRequest request.CreateRecipeRequest
 	json.NewDecoder(r.Body).Decode(&replaceRecipeRequest)
-
-	var recipe model.Recipe
-	recipe.Id = id
 
 	recipe.Title = replaceRecipeRequest.Title
 	recipe.IngredientIds = replaceRecipeRequest.IngredientIds
@@ -71,18 +77,30 @@ func replaceRecipe(w http.ResponseWriter, r *http.Request) {
 	recipe.LastModified = new(time.Time)
 	*recipe.LastModified = time.Now()
 
-	json.NewEncoder(w).Encode(recipe)
+	updatedRecipe, err := repository.UpdateRecipe(*recipe)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	json.NewEncoder(w).Encode(updatedRecipe)
 }
 
 func updateRecipe(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
+	recipe, err := repository.GetRecipe(id)
+	if err != nil && err.Error() == "Result contains no more records" {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
 	var updateRecipeRequest request.UpdateRecipeRequest
 	json.NewDecoder(r.Body).Decode(&updateRecipeRequest)
-
-	var recipe model.Recipe
-	recipe.Id = id
 
 	if updateRecipeRequest.Title != nil {
 		recipe.Title = *updateRecipeRequest.Title
@@ -99,7 +117,13 @@ func updateRecipe(w http.ResponseWriter, r *http.Request) {
 	recipe.LastModified = new(time.Time)
 	*recipe.LastModified = time.Now()
 
-	json.NewEncoder(w).Encode(recipe)
+	updatedRecipe, err := repository.UpdateRecipe(*recipe)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	json.NewEncoder(w).Encode(updatedRecipe)
 }
 
 func deleteRecipe(w http.ResponseWriter, r *http.Request) {
