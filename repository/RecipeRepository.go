@@ -97,12 +97,13 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 		// todo different id function?
-		query := "CREATE (r:Recipe) SET r.id = toString(id(r)), r.title = $title, r.steps = $steps, r.created = $created\n" +
+		query := "CREATE (r:Recipe) SET r.id = toString(id(r)), r.title = $title, description = $description, r.steps = $steps, r.created = $created\n" +
 			"RETURN r"
 		params := map[string]any{
-			"title":   recipe.Title,
-			"steps":   recipe.Steps,
-			"created": neo4j.LocalDateTime(*recipe.Created),
+			"title":       recipe.Title,
+			"description": recipe.Description,
+			"steps":       recipe.Steps,
+			"created":     neo4j.LocalDateTime(*recipe.Created),
 		}
 
 		result, err := tx.Run(r.ctx, query, params)
@@ -129,11 +130,12 @@ func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
 	defer session.Close(r.ctx)
 
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
-		query := fmt.Sprintf("%s SET r.title = $title, r.steps = $steps, r.lastModified = $lastModified\n"+
+		query := fmt.Sprintf("%s SET r.title = $title, description = $description, r.steps = $steps, r.lastModified = $lastModified\n"+
 			"RETURN r",
 			matchRecipeById)
 		params := map[string]any{
 			"id":           recipe.Id,
+			"description":  recipe.Description,
 			"title":        recipe.Title,
 			"steps":        recipe.Steps,
 			"lastModified": neo4j.LocalDateTime(*recipe.LastModified),
@@ -203,6 +205,14 @@ func ParseRecipeNode(node dbtype.Node) (*model.Recipe, error) {
 		return nil, err
 	}
 
+	description := new(string)
+	rawDescription, err := neo4j.GetProperty[string](node, "description")
+	if err != nil {
+		description = nil
+	} else {
+		*description = rawDescription
+	}
+
 	rawSteps, err := neo4j.GetProperty[[]any](node, "steps")
 	if err != nil {
 		return nil, err
@@ -224,5 +234,5 @@ func ParseRecipeNode(node dbtype.Node) (*model.Recipe, error) {
 		*lastModified = rawLastModified.Time()
 	}
 
-	return &model.Recipe{Id: id, Title: title, Steps: steps, Created: created, LastModified: lastModified}, nil
+	return &model.Recipe{Id: id, Title: title, Description: description, Steps: steps, Created: created, LastModified: lastModified}, nil
 }

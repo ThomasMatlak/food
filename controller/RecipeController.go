@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ThomasMatlak/food/controller/request"
@@ -63,7 +64,8 @@ func (rc *RecipeController) createRecipe(w http.ResponseWriter, r *http.Request)
 
 	var newRecipe model.Recipe
 
-	newRecipe.Title = createRecipeRequest.Title
+	newRecipe.Title = strings.TrimSpace(createRecipeRequest.Title)
+	*newRecipe.Description = strings.TrimSpace(*createRecipeRequest.Description)
 	newRecipe.IngredientIds = createRecipeRequest.IngredientIds
 	newRecipe.Steps = createRecipeRequest.Steps
 
@@ -95,7 +97,8 @@ func (rc *RecipeController) replaceRecipe(w http.ResponseWriter, r *http.Request
 	var replaceRecipeRequest request.CreateRecipeRequest
 	json.NewDecoder(r.Body).Decode(&replaceRecipeRequest)
 
-	recipe.Title = replaceRecipeRequest.Title
+	recipe.Title = strings.TrimSpace(replaceRecipeRequest.Title)
+	*recipe.Description = strings.TrimSpace(*replaceRecipeRequest.Description)
 	recipe.IngredientIds = replaceRecipeRequest.IngredientIds
 	recipe.Steps = replaceRecipeRequest.Steps
 
@@ -128,7 +131,11 @@ func (rc *RecipeController) updateRecipe(w http.ResponseWriter, r *http.Request)
 	json.NewDecoder(r.Body).Decode(&updateRecipeRequest)
 
 	if updateRecipeRequest.Title != nil {
-		recipe.Title = *updateRecipeRequest.Title
+		recipe.Title = strings.TrimSpace(*updateRecipeRequest.Title)
+	}
+
+	if updateRecipeRequest.Description != nil {
+		*recipe.Description = strings.TrimSpace(*updateRecipeRequest.Description)
 	}
 
 	if updateRecipeRequest.IngredientIds != nil {

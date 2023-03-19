@@ -5,6 +5,7 @@ import "time"
 type Recipe struct {
 	Id            string     `json:"id"`
 	Title         string     `json:"title"`
+	Description   *string    `json:"description"`
 	IngredientIds []string   `json:"ingredient_ids"`
 	Steps         []string   `json:"steps"`
 	Created       *time.Time `json:"created"`
