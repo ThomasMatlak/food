@@ -3,11 +3,11 @@ package model
 type Recipe struct {
 	// TODO categories
 	// TODO images
-	Id            string   `json:"id"`
-	Title         string   `json:"title"`
-	Description   *string  `json:"description"`
-	IngredientIds []string `json:"ingredient_ids"`
-	Steps         []string `json:"steps"`
+	Id          string               `json:"id"`
+	Title       string               `json:"title"`
+	Description *string              `json:"description"`
+	Ingredients []ContainsIngredient `json:"ingredients"`
+	Steps       []string             `json:"steps"`
 	Resource
 }
 

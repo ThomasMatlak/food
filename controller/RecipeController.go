@@ -70,7 +70,7 @@ func (rc *RecipeController) createRecipe(w http.ResponseWriter, r *http.Request)
 	if createRecipeRequest.Description != nil {
 		*newRecipe.Description = strings.TrimSpace(*createRecipeRequest.Description)
 	}
-	newRecipe.IngredientIds = createRecipeRequest.IngredientIds
+	newRecipe.Ingredients = createRecipeRequest.Ingredients
 	newRecipe.Steps = createRecipeRequest.Steps
 
 	// TODO handle creation time in controllers, repositories, or on the db?
@@ -108,8 +108,7 @@ func (rc *RecipeController) replaceRecipe(w http.ResponseWriter, r *http.Request
 	} else {
 		recipe.Description = nil
 	}
-	*recipe.Description = strings.TrimSpace(*replaceRecipeRequest.Description)
-	recipe.IngredientIds = replaceRecipeRequest.IngredientIds
+	recipe.Ingredients = replaceRecipeRequest.Ingredients
 	recipe.Steps = replaceRecipeRequest.Steps
 
 	// TODO handle lastModified time in controllers, repositories, or on the db?
@@ -149,8 +148,8 @@ func (rc *RecipeController) updateRecipe(w http.ResponseWriter, r *http.Request)
 		*recipe.Description = strings.TrimSpace(*updateRecipeRequest.Description)
 	}
 
-	if updateRecipeRequest.IngredientIds != nil {
-		recipe.IngredientIds = *updateRecipeRequest.IngredientIds
+	if updateRecipeRequest.Ingredients != nil {
+		recipe.Ingredients = *updateRecipeRequest.Ingredients
 	}
 
 	if updateRecipeRequest.Steps != nil {

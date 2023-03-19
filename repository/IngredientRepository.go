@@ -71,7 +71,7 @@ func (r *IngredientRepository) GetById(id string) (*model.Ingredient, bool, erro
 			"RETURN i",
 			MatchNodeById("i", []string{IngredientLabel}))
 		params := map[string]any{
-			"id": id,
+			"iId": id,
 		}
 
 		record, err := RunAndReturnSingleRecord(r.ctx, tx, query, params)
@@ -134,7 +134,7 @@ func (r *IngredientRepository) Update(ingredient model.Ingredient) (*model.Ingre
 			"RETURN i",
 			MatchNodeById("i", []string{IngredientLabel}))
 		params := map[string]any{
-			"id":           ingredient.Id,
+			"iId":          ingredient.Id,
 			"name":         ingredient.Name,
 			"lastModified": neo4j.LocalDateTime(*ingredient.LastModified),
 		}
@@ -162,7 +162,7 @@ func (r *IngredientRepository) Delete(id string) (string, error) {
 			"RETURN i.id AS id",
 			MatchNodeById("i", []string{IngredientLabel}))
 		params := map[string]any{
-			"id":      id,
+			"iId":     id,
 			"deleted": neo4j.LocalDateTime(time.Now()),
 		}
 
@@ -191,7 +191,7 @@ func ParseIngredientNode(node dbtype.Node) (*model.Ingredient, error) {
 		return nil, err
 	}
 
-	resource, err := ParseResourceNode(node)
+	resource, err := ParseResourceEntity(node)
 	if err != nil {
 		return nil, err
 	}

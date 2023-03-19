@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ThomasMatlak/food/model"
@@ -69,10 +70,14 @@ func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
 
 	recipe, err := neo4j.ExecuteRead(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 		query := fmt.Sprintf("%s WHERE r.deleted IS NULL\n"+
-			"RETURN r",
-			MatchNodeById("r", []string{RecipeLabel}))
+			// TODO OPTIONAL MATCH?
+			"MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
+			"RETURN r AS recipe, collect(ci) AS rels",
+			MatchNodeById("r", []string{RecipeLabel}),
+			ContainsIngredientLabel,
+			IngredientLabel)
 		params := map[string]any{
-			"id": id,
+			"rId": id,
 		}
 
 		record, err := RunAndReturnSingleRecord(r.ctx, tx, query, params)
@@ -80,12 +85,35 @@ func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
 			return nil, err
 		}
 
-		node, found := TypedGet[neo4j.Node](record, "r")
+		recipeNode, found := TypedGet[neo4j.Node](record, "recipe")
 		if !found {
-			return nil, errors.New("could not find column r")
+			return nil, errors.New("could not find column recipe")
 		}
 
-		return ParseRecipeNode(node)
+		recipe, err := ParseRecipeNode(recipeNode)
+		if err != nil {
+			return nil, err
+		}
+
+		rawIngredients, found := TypedGet[[]any](record, "rels")
+		if !found {
+			return nil, errors.New("could not find column rels")
+		}
+		ingredients := util.UnpackArray[dbtype.Relationship](rawIngredients)
+
+		recipeIngredients := []model.ContainsIngredient{}
+		for i := range ingredients {
+			containsIngredientRel := ingredients[i]
+			containsIngredient, err := ParseContainsIngredientRelationship(containsIngredientRel)
+			if err != nil {
+				return nil, err
+			}
+
+			recipeIngredients = append(recipeIngredients, *containsIngredient)
+		}
+
+		recipe.Ingredients = recipeIngredients
+		return recipe, nil
 	})
 
 	if err != nil && err.Error() == "Result contains no more records" {
@@ -102,28 +130,83 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 	defer session.Close(r.ctx)
 
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
+		relateIngredientStmts := []string{}
+		ingredientIdParams := map[string]any{}
+		for i, containsIngredient := range recipe.Ingredients {
+			nodeVar := fmt.Sprintf("i%d", i)
+			unitVar := fmt.Sprintf("i%dUnit", i)
+			amountVar := fmt.Sprintf("i%dAmount", i)
+			// TODO fail if ingredient not found
+			statement := fmt.Sprintf("%s CREATE (r)-[:`%s` {unit: $%s, amount: $%s, created: $created}]->(%s)",
+				MatchNodeById(nodeVar, []string{IngredientLabel}),
+				ContainsIngredientLabel,
+				unitVar,
+				amountVar,
+				nodeVar)
+
+			relateIngredientStmts = append(relateIngredientStmts, statement)
+			ingredientIdParams[fmt.Sprintf("%sId", nodeVar)] = containsIngredient.TargetId
+			ingredientIdParams[fmt.Sprintf("%sUnit", nodeVar)] = containsIngredient.Unit
+			ingredientIdParams[fmt.Sprintf("%sAmount", nodeVar)] = containsIngredient.Amount
+		}
+
 		// TODO different id function?
 		query := fmt.Sprintf("CREATE (r:`%s`:`%s`) SET r.id = toString(id(r)), r.title = $title, r.description = $description, r.steps = $steps, r.created = $created\n"+
-			"RETURN r",
-			RecipeLabel, ResourceLabel)
+			"WITH r\n"+
+			"%s\n"+
+			"WITH r MATCH (r)-[ci:`%s`]->(:`%s`)\n"+
+			"RETURN r AS recipe, collect(ci) AS rels",
+			RecipeLabel, ResourceLabel,
+			strings.Join(relateIngredientStmts, "\n"),
+			ContainsIngredientLabel,
+			IngredientLabel)
 		params := map[string]any{
 			"title":       recipe.Title,
 			"description": recipe.Description,
 			"steps":       recipe.Steps,
 			"created":     neo4j.LocalDateTime(*recipe.Created),
 		}
+		for k, v := range ingredientIdParams {
+			params[k] = v
+		}
+
+		fmt.Println(query)
+		fmt.Println(params)
 
 		record, err := RunAndReturnSingleRecord(r.ctx, tx, query, params)
 		if err != nil {
 			return nil, err
 		}
 
-		node, found := TypedGet[neo4j.Node](record, "r")
+		recipeNode, found := TypedGet[neo4j.Node](record, "recipe")
 		if !found {
-			return nil, errors.New("could not find column r")
+			return nil, errors.New("could not find column recipe")
 		}
 
-		return ParseRecipeNode(node)
+		recipe, err := ParseRecipeNode(recipeNode)
+		if err != nil {
+			return nil, err
+		}
+
+		rawIngredients, found := TypedGet[[]any](record, "rels")
+		if !found {
+			return nil, errors.New("could not find column rels")
+		}
+		ingredients := util.UnpackArray[dbtype.Relationship](rawIngredients)
+
+		recipeIngredients := []model.ContainsIngredient{}
+		for i := range ingredients {
+			containsIngredientRel := ingredients[i]
+			containsIngredient, err := ParseContainsIngredientRelationship(containsIngredientRel)
+			if err != nil {
+				return nil, err
+			}
+
+			recipeIngredients = append(recipeIngredients, *containsIngredient)
+		}
+
+		recipe.Ingredients = recipeIngredients
+		return recipe, nil
 	})
 }
 
@@ -132,11 +215,12 @@ func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
 	defer session.Close(r.ctx)
 
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
+		// TODO run a diff and mark the rel to ingredients that are not used as deleted
 		query := fmt.Sprintf("%s SET r.title = $title, description = $description, r.steps = $steps, r.lastModified = $lastModified\n"+
 			"RETURN r",
 			MatchNodeById("r", []string{RecipeLabel}))
 		params := map[string]any{
-			"id":           recipe.Id,
+			"rId":          recipe.Id,
 			"description":  recipe.Description,
 			"title":        recipe.Title,
 			"steps":        recipe.Steps,
@@ -162,11 +246,13 @@ func (r *RecipeRepository) Delete(id string) (string, error) {
 	defer session.Close(r.ctx)
 
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
+		// TODO mark relationships as deleted?
+		// TODO apply a Deleted label? (and filter that Resources are not Deleted)
 		query := fmt.Sprintf("%s SET r.deleted = $deleted\n"+
 			"RETURN r.id AS id",
 			MatchNodeById("r", []string{RecipeLabel}))
 		params := map[string]any{
-			"id":      id,
+			"rId":     id,
 			"deleted": neo4j.LocalDateTime(time.Now()),
 		}
 
@@ -209,7 +295,7 @@ func ParseRecipeNode(node dbtype.Node) (*model.Recipe, error) {
 	}
 	steps := util.UnpackArray[string](rawSteps)
 
-	resource, err := ParseResourceNode(node)
+	resource, err := ParseResourceEntity(node)
 	if err != nil {
 		return nil, err
 	}

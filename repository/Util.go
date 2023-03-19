@@ -18,7 +18,7 @@ func TypedGet[T any](record *db.Record, column string) (T, bool) {
 }
 
 func MatchNodeById(name string, labels []string) string {
-	return fmt.Sprintf("MATCH (`%s`:`%s` {id: $id})", name, strings.Join(labels, "`:`"))
+	return fmt.Sprintf("MATCH (`%s`:`%s` {id: $%sId})", name, strings.Join(labels, "`:`"), name)
 }
 
 func RunAndReturnSingleRecord(ctx context.Context, tx neo4j.ManagedTransaction, query string, params map[string]any) (*db.Record, error) {
@@ -35,7 +35,7 @@ func RunAndReturnSingleRecord(ctx context.Context, tx neo4j.ManagedTransaction, 
 	return record, nil
 }
 
-func ParseResourceNode(node dbtype.Node) (*model.Resource, error) {
+func ParseResourceEntity(node dbtype.Entity) (*model.Resource, error) {
 	rawCreated, err := neo4j.GetProperty[neo4j.LocalDateTime](node, "created")
 	if err != nil {
 		return nil, err
