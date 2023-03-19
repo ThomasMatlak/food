@@ -13,7 +13,14 @@ import (
 )
 
 func allRecipes(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	recipes, err := repository.GetRecipes()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	response := response.GetRecipesResponse{Recipes: recipes}
+	json.NewEncoder(w).Encode(response)
 }
 
 func getRecipe(w http.ResponseWriter, r *http.Request) {
@@ -145,9 +152,7 @@ func deleteRecipe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var deleteRecipeResponse response.DeleteRecipeResponse
-	deleteRecipeResponse.Id = deletedId
-
+	deleteRecipeResponse := response.DeleteRecipeResponse{Id: deletedId}
 	json.NewEncoder(w).Encode(deleteRecipeResponse)
 }
 

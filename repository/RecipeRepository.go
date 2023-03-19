@@ -11,6 +11,89 @@ import (
 )
 
 var dbUri string = "bolt://localhost:7687" // todo get from configuration
+// todo abstract out the driver and context creation
+// todo abstract result handling
+
+func GetRecipes() ([]model.Recipe, error) {
+	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth()) // todo implement auth
+	if err != nil {
+		panic(err)
+	}
+
+	ctx := context.Background()
+	defer driver.Close(ctx)
+
+	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(ctx)
+
+	return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Recipe, error) {
+		query := "MATCH (r:Recipe) WHERE r.deleted IS NULL\n" +
+			"RETURN r"
+		params := map[string]any{}
+
+		result, err := tx.Run(ctx, query, params)
+		if err != nil {
+			return nil, err
+		}
+
+		records, err := result.Collect(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		recipes := make([]model.Recipe, len(records))
+
+		for i := 0; i < len(records); i++ {
+			rawNode, found := records[i].Get("r")
+			if !found {
+				continue
+			}
+
+			node := rawNode.(neo4j.Node)
+
+			id, err := neo4j.GetProperty[string](node, "id")
+			if err != nil {
+				return nil, err
+			}
+
+			title, err := neo4j.GetProperty[string](node, "title")
+			if err != nil {
+				return nil, err
+			}
+
+			// ingredientIds, err := neo4j.GetProperty[string](node, "ingredientIds")
+			// if err != nil {
+			// 	return nil, err
+			// }
+
+			rawSteps, err := neo4j.GetProperty[[]any](node, "steps")
+			if err != nil {
+				return nil, err
+			}
+			steps := util.UnpackArray[string](rawSteps)
+
+			rawCreated, err := neo4j.GetProperty[neo4j.LocalDateTime](node, "created")
+			if err != nil {
+				return nil, err
+			}
+			created := new(time.Time)
+			*created = rawCreated.Time()
+
+			rawLastModified, err := neo4j.GetProperty[neo4j.LocalDateTime](node, "lastModified")
+			lastModified := new(time.Time)
+			if err != nil {
+				lastModified = nil
+			} else {
+				*lastModified = rawLastModified.Time()
+			}
+
+			recipe := model.Recipe{Id: id, Title: title, Steps: steps, Created: created, LastModified: lastModified}
+			recipes[i] = recipe
+		}
+
+		return recipes, nil
+	})
+}
 
 func GetRecipe(id string) (*model.Recipe, error) {
 	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth()) // todo implement auth
@@ -31,12 +114,12 @@ func GetRecipe(id string) (*model.Recipe, error) {
 			"id": id,
 		}
 
-		records, err := tx.Run(ctx, query, params)
+		result, err := tx.Run(ctx, query, params)
 		if err != nil {
 			return nil, err
 		}
 
-		record, err := records.Single(ctx)
+		record, err := result.Single(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -110,12 +193,12 @@ func CreateRecipe(recipe model.Recipe) (*model.Recipe, error) {
 			"created": neo4j.LocalDateTime(*recipe.Created),
 		}
 
-		records, err := tx.Run(ctx, query, params)
+		result, err := tx.Run(ctx, query, params)
 		if err != nil {
 			return nil, err
 		}
 
-		record, err := records.Single(ctx)
+		record, err := result.Single(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -181,12 +264,12 @@ func UpdateRecipe(recipe model.Recipe) (*model.Recipe, error) {
 			"lastModified": neo4j.LocalDateTime(*recipe.LastModified),
 		}
 
-		records, err := tx.Run(ctx, query, params)
+		result, err := tx.Run(ctx, query, params)
 		if err != nil {
 			return nil, err
 		}
 
-		record, err := records.Single(ctx)
+		record, err := result.Single(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -258,12 +341,12 @@ func DeleteRecipe(id string) (string, error) {
 			"deleted": neo4j.LocalDateTime(time.Now()),
 		}
 
-		records, err := tx.Run(ctx, query, params)
+		result, err := tx.Run(ctx, query, params)
 		if err != nil {
 			return "", err
 		}
 
-		record, err := records.Single(ctx)
+		record, err := result.Single(ctx)
 		if err != nil {
 			return "", err
 		}
