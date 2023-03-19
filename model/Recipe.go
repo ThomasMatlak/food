@@ -11,3 +11,11 @@ type Recipe struct {
 	LastModified  *time.Time `json:"last_modified"`
 	Deleted       *time.Time `json:"deleted"`
 }
+
+type RecipeRepository interface {
+	GetAll() ([]Recipe, error)
+	GetById(id string) (*Recipe, error)
+	Create(recipe Recipe) (*Recipe, error)
+	Update(recipe Recipe) (*Recipe, error)
+	Delete(id string) (string, error)
+}

@@ -8,12 +8,30 @@ import (
 	"github.com/ThomasMatlak/food/controller/request"
 	"github.com/ThomasMatlak/food/controller/response"
 	"github.com/ThomasMatlak/food/model"
-	"github.com/ThomasMatlak/food/repository"
 	"github.com/gorilla/mux"
 )
 
-func allRecipes(w http.ResponseWriter, r *http.Request) {
-	recipes, err := repository.GetRecipes()
+type RecipeController struct {
+	recipeRepository model.RecipeRepository
+}
+
+func NewRecipeController(recipeRepository model.RecipeRepository) *RecipeController {
+	return &RecipeController{recipeRepository: recipeRepository}
+}
+
+func (rc *RecipeController) RecipeRoutes(router *mux.Router) {
+	reciperouter := router.PathPrefix("/recipe").Subrouter()
+
+	reciperouter.HandleFunc("", rc.allRecipes).Methods("GET")
+	reciperouter.HandleFunc("/{id}", rc.getRecipe).Methods("GET")
+	reciperouter.HandleFunc("", rc.createRecipe).Methods("POST")
+	reciperouter.HandleFunc("/{id}", rc.replaceRecipe).Methods("PUT")
+	reciperouter.HandleFunc("/{id}", rc.updateRecipe).Methods("PATCH")
+	reciperouter.HandleFunc("/{id}", rc.deleteRecipe).Methods("DELETE")
+}
+
+func (rc *RecipeController) allRecipes(w http.ResponseWriter, r *http.Request) {
+	recipes, err := rc.recipeRepository.GetAll()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -23,11 +41,11 @@ func allRecipes(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func getRecipe(w http.ResponseWriter, r *http.Request) {
+func (rc *RecipeController) getRecipe(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	recipe, err := repository.GetRecipe(id)
+	recipe, err := rc.recipeRepository.GetById(id)
 	if err != nil && err.Error() == "Result contains no more records" { // todo is there a better way to do this?
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
@@ -39,7 +57,7 @@ func getRecipe(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(recipe)
 }
 
-func createRecipe(w http.ResponseWriter, r *http.Request) {
+func (rc *RecipeController) createRecipe(w http.ResponseWriter, r *http.Request) {
 	var createRecipeRequest request.CreateRecipeRequest
 	json.NewDecoder(r.Body).Decode(&createRecipeRequest)
 
@@ -52,7 +70,7 @@ func createRecipe(w http.ResponseWriter, r *http.Request) {
 	newRecipe.Created = new(time.Time)
 	*newRecipe.Created = time.Now()
 
-	recipe, err := repository.CreateRecipe(newRecipe)
+	recipe, err := rc.recipeRepository.Create(newRecipe)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -61,11 +79,11 @@ func createRecipe(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(recipe)
 }
 
-func replaceRecipe(w http.ResponseWriter, r *http.Request) {
+func (rc *RecipeController) replaceRecipe(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	recipe, err := repository.GetRecipe(id)
+	recipe, err := rc.recipeRepository.GetById(id)
 	if err != nil && err.Error() == "Result contains no more records" {
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
@@ -84,7 +102,7 @@ func replaceRecipe(w http.ResponseWriter, r *http.Request) {
 	recipe.LastModified = new(time.Time)
 	*recipe.LastModified = time.Now()
 
-	updatedRecipe, err := repository.UpdateRecipe(*recipe)
+	updatedRecipe, err := rc.recipeRepository.Update(*recipe)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -93,11 +111,11 @@ func replaceRecipe(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(updatedRecipe)
 }
 
-func updateRecipe(w http.ResponseWriter, r *http.Request) {
+func (rc *RecipeController) updateRecipe(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	recipe, err := repository.GetRecipe(id)
+	recipe, err := rc.recipeRepository.GetById(id)
 	if err != nil && err.Error() == "Result contains no more records" {
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
@@ -124,7 +142,7 @@ func updateRecipe(w http.ResponseWriter, r *http.Request) {
 	recipe.LastModified = new(time.Time)
 	*recipe.LastModified = time.Now()
 
-	updatedRecipe, err := repository.UpdateRecipe(*recipe)
+	updatedRecipe, err := rc.recipeRepository.Update(*recipe)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -133,11 +151,11 @@ func updateRecipe(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(updatedRecipe)
 }
 
-func deleteRecipe(w http.ResponseWriter, r *http.Request) {
+func (rc *RecipeController) deleteRecipe(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	recipe, err := repository.GetRecipe(id)
+	recipe, err := rc.recipeRepository.GetById(id)
 	if err != nil && err.Error() == "Result contains no more records" {
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
@@ -146,7 +164,7 @@ func deleteRecipe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deletedId, err := repository.DeleteRecipe(recipe.Id)
+	deletedId, err := rc.recipeRepository.Delete(recipe.Id)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -154,15 +172,4 @@ func deleteRecipe(w http.ResponseWriter, r *http.Request) {
 
 	deleteRecipeResponse := response.DeleteRecipeResponse{Id: deletedId}
 	json.NewEncoder(w).Encode(deleteRecipeResponse)
-}
-
-func RecipeRoutes(router *mux.Router) {
-	reciperouter := router.PathPrefix("/recipe").Subrouter()
-
-	reciperouter.HandleFunc("", allRecipes).Methods("GET")
-	reciperouter.HandleFunc("/{id}", getRecipe).Methods("GET")
-	reciperouter.HandleFunc("", createRecipe).Methods("POST")
-	reciperouter.HandleFunc("/{id}", replaceRecipe).Methods("PUT")
-	reciperouter.HandleFunc("/{id}", updateRecipe).Methods("PATCH")
-	reciperouter.HandleFunc("/{id}", deleteRecipe).Methods("DELETE")
 }

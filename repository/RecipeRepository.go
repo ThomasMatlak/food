@@ -12,32 +12,30 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 )
 
-var dbUri string = "bolt://localhost:7687" // todo get from configuration
-// todo abstract out the driver and context creation
+type RecipeRepository struct {
+	ctx    context.Context
+	driver neo4j.DriverWithContext
+}
 
-func GetRecipes() ([]model.Recipe, error) {
-	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth()) // todo implement auth
-	if err != nil {
-		return nil, err
-	}
+func NewRecipeRepository(ctx context.Context, driver neo4j.DriverWithContext) *RecipeRepository {
+	return &RecipeRepository{ctx: ctx, driver: driver}
+}
 
-	ctx := context.Background()
-	defer driver.Close(ctx)
+func (r *RecipeRepository) GetAll() ([]model.Recipe, error) {
+	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(r.ctx)
 
-	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(ctx)
-
-	return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Recipe, error) {
+	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Recipe, error) {
 		query := "MATCH (r:Recipe) WHERE r.deleted IS NULL\n" +
 			"RETURN r"
 		params := map[string]any{}
 
-		result, err := tx.Run(ctx, query, params)
+		result, err := tx.Run(r.ctx, query, params)
 		if err != nil {
 			return nil, err
 		}
 
-		records, err := result.Collect(ctx)
+		records, err := result.Collect(r.ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -62,19 +60,11 @@ func GetRecipes() ([]model.Recipe, error) {
 	})
 }
 
-func GetRecipe(id string) (*model.Recipe, error) {
-	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth()) // todo implement auth
-	if err != nil {
-		return nil, err
-	}
+func (r *RecipeRepository) GetById(id string) (*model.Recipe, error) {
+	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(r.ctx)
 
-	ctx := context.Background()
-	defer driver.Close(ctx)
-
-	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(ctx)
-
-	return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
+	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 		query := fmt.Sprintf("%s WHERE r.deleted IS NULL\n"+
 			"RETURN r",
 			matchRecipeById)
@@ -82,12 +72,12 @@ func GetRecipe(id string) (*model.Recipe, error) {
 			"id": id,
 		}
 
-		result, err := tx.Run(ctx, query, params)
+		result, err := tx.Run(r.ctx, query, params)
 		if err != nil {
 			return nil, err
 		}
 
-		record, err := result.Single(ctx)
+		record, err := result.Single(r.ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -101,19 +91,11 @@ func GetRecipe(id string) (*model.Recipe, error) {
 	})
 }
 
-func CreateRecipe(recipe model.Recipe) (*model.Recipe, error) {
-	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth()) // todo implement auth
-	if err != nil {
-		return nil, err
-	}
+func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
+	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(r.ctx)
 
-	ctx := context.Background()
-	defer driver.Close(ctx)
-
-	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(ctx)
-
-	return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
+	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 		// todo different id function?
 		query := "CREATE (r:Recipe) SET r.id = toString(id(r)), r.title = $title, r.steps = $steps, r.created = $created\n" +
 			"RETURN r"
@@ -123,12 +105,12 @@ func CreateRecipe(recipe model.Recipe) (*model.Recipe, error) {
 			"created": neo4j.LocalDateTime(*recipe.Created),
 		}
 
-		result, err := tx.Run(ctx, query, params)
+		result, err := tx.Run(r.ctx, query, params)
 		if err != nil {
 			return nil, err
 		}
 
-		record, err := result.Single(ctx)
+		record, err := result.Single(r.ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -142,19 +124,11 @@ func CreateRecipe(recipe model.Recipe) (*model.Recipe, error) {
 	})
 }
 
-func UpdateRecipe(recipe model.Recipe) (*model.Recipe, error) {
-	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth()) // todo implement auth
-	if err != nil {
-		return nil, err
-	}
+func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
+	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(r.ctx)
 
-	ctx := context.Background()
-	defer driver.Close(ctx)
-
-	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(ctx)
-
-	return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
+	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 		query := fmt.Sprintf("%s SET r.title = $title, r.steps = $steps, r.lastModified = $lastModified\n"+
 			"RETURN r",
 			matchRecipeById)
@@ -165,12 +139,12 @@ func UpdateRecipe(recipe model.Recipe) (*model.Recipe, error) {
 			"lastModified": neo4j.LocalDateTime(*recipe.LastModified),
 		}
 
-		result, err := tx.Run(ctx, query, params)
+		result, err := tx.Run(r.ctx, query, params)
 		if err != nil {
 			return nil, err
 		}
 
-		record, err := result.Single(ctx)
+		record, err := result.Single(r.ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -184,19 +158,11 @@ func UpdateRecipe(recipe model.Recipe) (*model.Recipe, error) {
 	})
 }
 
-func DeleteRecipe(id string) (string, error) {
-	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth()) // todo implement auth
-	if err != nil {
-		return "", err
-	}
+func (r *RecipeRepository) Delete(id string) (string, error) {
+	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(r.ctx)
 
-	ctx := context.Background()
-	defer driver.Close(ctx)
-
-	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(ctx)
-
-	return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
+	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
 		query := fmt.Sprintf("%s SET r.deleted = $deleted\n"+
 			"RETURN r.id AS id",
 			matchRecipeById)
@@ -205,12 +171,12 @@ func DeleteRecipe(id string) (string, error) {
 			"deleted": neo4j.LocalDateTime(time.Now()),
 		}
 
-		result, err := tx.Run(ctx, query, params)
+		result, err := tx.Run(r.ctx, query, params)
 		if err != nil {
 			return "", err
 		}
 
-		record, err := result.Single(ctx)
+		record, err := result.Single(r.ctx)
 		if err != nil {
 			return "", err
 		}
