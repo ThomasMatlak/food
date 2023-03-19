@@ -12,8 +12,13 @@ import (
 )
 
 func main() {
-	dbUri := "bolt://localhost:7687"                                 // TODO get from configuration
-	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth()) // TODO implement auth
+	dbUri := "bolt://localhost:7687" // TODO get from configuration
+	useConsoleLogger := func(level neo4j.LogLevel) func(config *neo4j.Config) {
+		return func(config *neo4j.Config) {
+			config.Log = neo4j.ConsoleLogger(level)
+		}
+	}
+	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.NoAuth(), useConsoleLogger(neo4j.DEBUG)) // TODO implement auth
 	if err != nil {
 		panic(err)
 	}
