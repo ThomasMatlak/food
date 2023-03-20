@@ -8,6 +8,10 @@ type ContainsIngredient struct {
 	Resource
 }
 
+func (l ContainsIngredient) Equal(r ContainsIngredient) bool {
+	return l.Unit == r.Unit && l.Amount == r.Amount && l.TargetId == r.TargetId
+}
+
 type Relationship struct {
 	SourceId *string `json:"source_id"`
 	TargetId string  `json:"target_id"`

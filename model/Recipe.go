@@ -1,13 +1,13 @@
 package model
 
 type Recipe struct {
-	// TODO categories
-	// TODO images
 	Id          string               `json:"id"`
 	Title       string               `json:"title"`
 	Description *string              `json:"description"`
 	Ingredients []ContainsIngredient `json:"ingredients"`
-	Steps       []string             `json:"steps"`
+	Steps       []string             `json:"steps"` // TODO step templates? (e.g. preheat oven to {x} degress, bake for {y} time) // TODO reusable (linkable) steps?
+	// TODO categories
+	// TODO images
 	Resource
 }
 

@@ -64,6 +64,11 @@ func (rc *RecipeController) createRecipe(w http.ResponseWriter, r *http.Request)
 	var createRecipeRequest request.CreateRecipeRequest
 	json.NewDecoder(r.Body).Decode(&createRecipeRequest)
 
+	if !request.CanCreateRecipe(&createRecipeRequest) {
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		return
+	}
+
 	var newRecipe model.Recipe
 
 	newRecipe.Title = strings.TrimSpace(createRecipeRequest.Title)
@@ -102,6 +107,11 @@ func (rc *RecipeController) replaceRecipe(w http.ResponseWriter, r *http.Request
 	var replaceRecipeRequest request.CreateRecipeRequest
 	json.NewDecoder(r.Body).Decode(&replaceRecipeRequest)
 
+	if !request.CanCreateRecipe(&replaceRecipeRequest) {
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		return
+	}
+
 	recipe.Title = strings.TrimSpace(replaceRecipeRequest.Title)
 	if replaceRecipeRequest.Description != nil {
 		*recipe.Description = strings.TrimSpace(*replaceRecipeRequest.Description)
@@ -139,6 +149,11 @@ func (rc *RecipeController) updateRecipe(w http.ResponseWriter, r *http.Request)
 
 	var updateRecipeRequest request.UpdateRecipeRequest
 	json.NewDecoder(r.Body).Decode(&updateRecipeRequest)
+
+	if !request.CanUpdateRecipe(&updateRecipeRequest) {
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		return
+	}
 
 	if updateRecipeRequest.Title != nil {
 		recipe.Title = strings.TrimSpace(*updateRecipeRequest.Title)

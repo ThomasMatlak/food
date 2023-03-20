@@ -29,9 +29,15 @@ func (r *RecipeRepository) GetAll() ([]model.Recipe, error) {
 
 	return neo4j.ExecuteRead(r.ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Recipe, error) {
 		query := fmt.Sprintf("MATCH (r:`%s`) WHERE r.deleted IS NULL\n"+
-			"RETURN r",
-			RecipeLabel)
+			"MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
+			"RETURN r AS recipe, collect(ci) AS rels",
+			RecipeLabel,
+			ContainsIngredientLabel, IngredientLabel)
 		params := map[string]any{}
+
+		// TODO use an actual logger
+		fmt.Println(query)
+		fmt.Println(params)
 
 		result, err := tx.Run(r.ctx, query, params)
 		if err != nil {
@@ -46,13 +52,25 @@ func (r *RecipeRepository) GetAll() ([]model.Recipe, error) {
 		recipes := make([]model.Recipe, len(records))
 
 		for i := 0; i < len(records); i++ {
-			node, found := TypedGet[neo4j.Node](records[i], "r")
+			recipeNode, found := TypedGet[neo4j.Node](records[i], "recipe")
 			if !found {
 				// TODO return error?
 				continue
 			}
 
-			recipe, err := ParseRecipeNode(node)
+			recipe, err := ParseRecipeNode(recipeNode)
+			if err != nil {
+				return nil, err
+			}
+
+			rawIngredients, found := TypedGet[[]any](records[i], "rels")
+			if !found {
+				// TODO return error?
+				continue
+			}
+			ingredients := util.UnpackArray[dbtype.Relationship](rawIngredients)
+
+			err = setIngredients(recipe, &ingredients)
 			if err != nil {
 				return nil, err
 			}
@@ -70,15 +88,16 @@ func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
 
 	recipe, err := neo4j.ExecuteRead(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 		query := fmt.Sprintf("%s WHERE r.deleted IS NULL\n"+
-			// TODO OPTIONAL MATCH?
 			"MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
 			"RETURN r AS recipe, collect(ci) AS rels",
 			MatchNodeById("r", []string{RecipeLabel}),
-			ContainsIngredientLabel,
-			IngredientLabel)
+			ContainsIngredientLabel, IngredientLabel)
 		params := map[string]any{
 			"rId": id,
 		}
+
+		fmt.Println(query)
+		fmt.Println(params)
 
 		record, err := RunAndReturnSingleRecord(r.ctx, tx, query, params)
 		if err != nil {
@@ -101,18 +120,10 @@ func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
 		}
 		ingredients := util.UnpackArray[dbtype.Relationship](rawIngredients)
 
-		recipeIngredients := []model.ContainsIngredient{}
-		for i := range ingredients {
-			containsIngredientRel := ingredients[i]
-			containsIngredient, err := ParseContainsIngredientRelationship(containsIngredientRel)
-			if err != nil {
-				return nil, err
-			}
-
-			recipeIngredients = append(recipeIngredients, *containsIngredient)
+		err = setIngredients(recipe, &ingredients)
+		if err != nil {
+			return nil, err
 		}
-
-		recipe.Ingredients = recipeIngredients
 		return recipe, nil
 	})
 
@@ -136,13 +147,9 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 			nodeVar := fmt.Sprintf("i%d", i)
 			unitVar := fmt.Sprintf("i%dUnit", i)
 			amountVar := fmt.Sprintf("i%dAmount", i)
-			// TODO fail if ingredient not found
+			// TODO fail if ingredient does not exist or has been deleted
 			statement := fmt.Sprintf("%s CREATE (r)-[:`%s` {unit: $%s, amount: $%s, created: $created}]->(%s)",
-				MatchNodeById(nodeVar, []string{IngredientLabel}),
-				ContainsIngredientLabel,
-				unitVar,
-				amountVar,
-				nodeVar)
+				MatchNodeById(nodeVar, []string{IngredientLabel}), ContainsIngredientLabel, unitVar, amountVar, nodeVar)
 
 			relateIngredientStmts = append(relateIngredientStmts, statement)
 			ingredientIdParams[fmt.Sprintf("%sId", nodeVar)] = containsIngredient.TargetId
@@ -151,15 +158,13 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 		}
 
 		// TODO different id function?
-		query := fmt.Sprintf("CREATE (r:`%s`:`%s`) SET r.id = toString(id(r)), r.title = $title, r.description = $description, r.steps = $steps, r.created = $created\n"+
-			"WITH r\n"+
-			"%s\n"+
-			"WITH r MATCH (r)-[ci:`%s`]->(:`%s`)\n"+
+		query := fmt.Sprintf("CREATE (r:`%s`:`%s`) SET r = {id: toString(id(r)), title: $title, description: $description, steps: $steps, created: $created}\n"+
+			"WITH r %s\n"+
+			"WITH r MATCH (r)-[ci:`%s`]->(:`%s`)\n"+ // the node and relationships have just been created, so no need to check they are not deleted
 			"RETURN r AS recipe, collect(ci) AS rels",
 			RecipeLabel, ResourceLabel,
-			strings.Join(relateIngredientStmts, "\n"),
-			ContainsIngredientLabel,
-			IngredientLabel)
+			strings.Join(relateIngredientStmts, "\nWITH r "),
+			ContainsIngredientLabel, IngredientLabel)
 		params := map[string]any{
 			"title":       recipe.Title,
 			"description": recipe.Description,
@@ -194,18 +199,10 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 		}
 		ingredients := util.UnpackArray[dbtype.Relationship](rawIngredients)
 
-		recipeIngredients := []model.ContainsIngredient{}
-		for i := range ingredients {
-			containsIngredientRel := ingredients[i]
-			containsIngredient, err := ParseContainsIngredientRelationship(containsIngredientRel)
-			if err != nil {
-				return nil, err
-			}
-
-			recipeIngredients = append(recipeIngredients, *containsIngredient)
+		err = setIngredients(recipe, &ingredients)
+		if err != nil {
+			return nil, err
 		}
-
-		recipe.Ingredients = recipeIngredients
 		return recipe, nil
 	})
 }
@@ -215,10 +212,80 @@ func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
 	defer session.Close(r.ctx)
 
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
-		// TODO run a diff and mark the rel to ingredients that are not used as deleted
-		query := fmt.Sprintf("%s SET r.title = $title, description = $description, r.steps = $steps, r.lastModified = $lastModified\n"+
-			"RETURN r",
-			MatchNodeById("r", []string{RecipeLabel}))
+		// TODO do on the db, if possible; very large ingredient lists could cause performance issues in the application
+
+		existingRecipe, found, err := r.GetById(recipe.Id)
+		if !found && err != nil {
+			return nil, err
+		} else if !found {
+			return nil, errors.New("recipe disappeared :(")
+		}
+
+		newIngredients := map[string]model.ContainsIngredient{}
+		for _, ci := range recipe.Ingredients {
+			newIngredients[ci.TargetId] = ci
+		}
+		existingIngredients := map[string]model.ContainsIngredient{}
+		for _, ci := range existingRecipe.Ingredients {
+			existingIngredients[ci.TargetId] = ci
+		}
+
+		newIngredientIds := util.ArrayToSet(util.Map(recipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.TargetId }))
+		existingIngredientIds := util.ArrayToSet(util.Map(existingRecipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.TargetId }))
+
+		removedIngredientIds := util.Difference(existingIngredientIds, newIngredientIds)
+		addedIngredientIds := util.Difference(newIngredientIds, existingIngredientIds)
+		updatedIngredientIds := util.Intersection(existingIngredientIds, newIngredientIds)
+
+		unRelateIngredientStms := []string{}
+		ingredientIdParams := map[string]any{}
+		for i, ingredientId := range util.SetToArray(removedIngredientIds) {
+			nodeVar := fmt.Sprintf("i%d", i)
+			relVar := fmt.Sprintf("ci%d", i)
+			statement := fmt.Sprintf("%s<-[`%s`:`%s`]-(r) SET `%s`.deleted = $lastModified",
+				MatchNodeById(nodeVar, []string{IngredientLabel}), relVar, ContainsIngredientLabel, relVar)
+			unRelateIngredientStms = append(unRelateIngredientStms, statement)
+			ingredientIdParams[fmt.Sprintf("%sId", nodeVar)] = ingredientId
+		}
+
+		offset := len(unRelateIngredientStms)
+		addIngredientStms := []string{}
+		for i, ingredientId := range util.SetToArray(addedIngredientIds) {
+			nodeVar := fmt.Sprintf("i%d", offset+i)
+			unitVar := fmt.Sprintf("i%dUnit", offset+i)
+			amountVar := fmt.Sprintf("i%dAmount", offset+i)
+			statement := fmt.Sprintf("%s CREATE (r)-[:`%s` {unit: $%s, amount: $%s, created: $lastModified}]->(`%s`)",
+				MatchNodeById(nodeVar, []string{IngredientLabel}), ContainsIngredientLabel, unitVar, amountVar, nodeVar)
+			addIngredientStms = append(addIngredientStms, statement)
+			ingredientIdParams[fmt.Sprintf("%sId", nodeVar)] = ingredientId
+			ingredientIdParams[fmt.Sprintf("%sUnit", nodeVar)] = newIngredients[ingredientId].Unit
+			ingredientIdParams[fmt.Sprintf("%sAmount", nodeVar)] = newIngredients[ingredientId].Amount
+		}
+
+		offset += len(addIngredientStms)
+		updateIngredientStms := []string{}
+		for i, ingredientId := range util.SetToArray(updatedIngredientIds) {
+			nodeVar := fmt.Sprintf("i%d", offset+i)
+			relVar := fmt.Sprintf("ci%d", offset+i)
+			unitVar := fmt.Sprintf("i%dUnit", offset+i)
+			amountVar := fmt.Sprintf("i%dAmount", offset+i)
+			statement := fmt.Sprintf("%s MATCH (r)-[`%s`:`%s`]->(`%s`) SET `%s` += {unit: $%s, amount: $%s, lastModified: $lastModified}",
+				MatchNodeById(nodeVar, []string{IngredientLabel}), relVar, ContainsIngredientLabel, nodeVar, relVar, unitVar, amountVar)
+			updateIngredientStms = append(updateIngredientStms, statement)
+			ingredientIdParams[fmt.Sprintf("%sId", nodeVar)] = ingredientId
+			ingredientIdParams[fmt.Sprintf("%sUnit", nodeVar)] = newIngredients[ingredientId].Unit
+			ingredientIdParams[fmt.Sprintf("%sAmount", nodeVar)] = newIngredients[ingredientId].Amount
+		}
+
+		relStmts := append(append(unRelateIngredientStms, addIngredientStms...), updateIngredientStms...)
+
+		query := fmt.Sprintf("%s SET r += {title: $title, description: $description, steps: $steps, lastModified: $lastModified}\n"+
+			"WITH r %s\n"+
+			"WITH r MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
+			"RETURN r AS recipe, collect(ci) AS rels",
+			MatchNodeById("r", []string{RecipeLabel}),
+			strings.Join(relStmts, "\nWITH r "),
+			ContainsIngredientLabel, IngredientLabel)
 		params := map[string]any{
 			"rId":          recipe.Id,
 			"description":  recipe.Description,
@@ -226,18 +293,39 @@ func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
 			"steps":        recipe.Steps,
 			"lastModified": neo4j.LocalDateTime(*recipe.LastModified),
 		}
+		for k, v := range ingredientIdParams {
+			params[k] = v
+		}
+
+		fmt.Println(query)
+		fmt.Println(params)
 
 		record, err := RunAndReturnSingleRecord(r.ctx, tx, query, params)
 		if err != nil {
 			return nil, err
 		}
 
-		node, found := TypedGet[neo4j.Node](record, "r")
+		recipeNode, found := TypedGet[neo4j.Node](record, "recipe")
 		if !found {
-			return nil, errors.New("could not find column r")
+			return nil, errors.New("could not find column recipe")
 		}
 
-		return ParseRecipeNode(node)
+		recipe, err := ParseRecipeNode(recipeNode)
+		if err != nil {
+			return nil, err
+		}
+
+		rawIngredients, found := TypedGet[[]any](record, "rels")
+		if !found {
+			return nil, errors.New("could not find column rels")
+		}
+		ingredients := util.UnpackArray[dbtype.Relationship](rawIngredients)
+
+		err = setIngredients(recipe, &ingredients)
+		if err != nil {
+			return nil, err
+		}
+		return recipe, nil
 	})
 }
 
@@ -246,15 +334,18 @@ func (r *RecipeRepository) Delete(id string) (string, error) {
 	defer session.Close(r.ctx)
 
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
-		// TODO mark relationships as deleted?
-		// TODO apply a Deleted label? (and filter that Resources are not Deleted)
-		query := fmt.Sprintf("%s SET r.deleted = $deleted\n"+
-			"RETURN r.id AS id",
-			MatchNodeById("r", []string{RecipeLabel}))
+		// TODO apply a Deleted label (and filter that :Resources are not also :Deleted)?
+		query := fmt.Sprintf("%s MATCH (r)-[rel]-(:`%s`) WHERE rel.deleted IS NULL\n"+
+			"SET r.deleted = $deleted, rel.deleted = $deleted\n"+
+			"WITH r RETURN r.id AS id",
+			MatchNodeById("r", []string{RecipeLabel}), ResourceLabel)
 		params := map[string]any{
 			"rId":     id,
 			"deleted": neo4j.LocalDateTime(time.Now()),
 		}
+
+		fmt.Println(query)
+		fmt.Println(params)
 
 		record, err := RunAndReturnSingleRecord(r.ctx, tx, query, params)
 		if err != nil {
@@ -301,4 +392,20 @@ func ParseRecipeNode(node dbtype.Node) (*model.Recipe, error) {
 	}
 
 	return &model.Recipe{Id: id, Title: title, Description: description, Steps: steps, Resource: *resource}, nil
+}
+
+func setIngredients(recipe *model.Recipe, containsIngredientRels *[]dbtype.Relationship) error {
+	recipeIngredients := []model.ContainsIngredient{}
+	for i := range *containsIngredientRels {
+		containsIngredientRel := (*containsIngredientRels)[i]
+		containsIngredient, err := ParseContainsIngredientRelationship(containsIngredientRel)
+		if err != nil {
+			return err
+		}
+
+		recipeIngredients = append(recipeIngredients, *containsIngredient)
+	}
+
+	recipe.Ingredients = recipeIngredients
+	return nil
 }

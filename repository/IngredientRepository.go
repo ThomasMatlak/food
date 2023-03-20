@@ -158,9 +158,10 @@ func (r *IngredientRepository) Delete(id string) (string, error) {
 	defer session.Close(r.ctx)
 
 	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
-		query := fmt.Sprintf("%s SET i.deleted = $deleted\n"+
+		query := fmt.Sprintf("%s MATCH (i)-[rel]-(:`%s`) WHERE rel.deleted IS NULL\n"+
+			"SET i.deleted = $deleted, rel.deleted = $deleted\n"+
 			"RETURN i.id AS id",
-			MatchNodeById("i", []string{IngredientLabel}))
+			MatchNodeById("i", []string{IngredientLabel}), ResourceLabel)
 		params := map[string]any{
 			"iId":     id,
 			"deleted": neo4j.LocalDateTime(time.Now()),
