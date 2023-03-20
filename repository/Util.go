@@ -10,7 +10,27 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
+	"github.com/rs/zerolog/log"
 )
+
+// TODO accept context and driver
+func RunQuery[T any](action string, work func(*string, *map[string]any) (T, error)) (T, error) {
+	// TODO create session
+	var query string
+	var params map[string]any
+
+	// TODO pass context and session to work()
+	result, err := work(&query, &params)
+
+	log.Debug().
+		Str("action", action).
+		Str("query", query).
+		Any("params", params).
+		Any("result", result).
+		Err(err).
+		Msg("run query")
+	return result, err
+}
 
 func TypedGet[T any](record *db.Record, column string) (T, bool) {
 	val, found := record.Get(column)
