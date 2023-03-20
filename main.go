@@ -26,10 +26,10 @@ func main() {
 	ctx := context.Background()
 	defer driver.Close(ctx)
 
-	recipeRepository := repository.NewRecipeRepository(ctx, driver)
+	recipeRepository := repository.NewRecipeRepository(driver)
 	recipeController := controller.NewRecipeController(recipeRepository)
 
-	ingredientRepository := repository.NewIngredientRepository(ctx, driver)
+	ingredientRepository := repository.NewIngredientRepository(driver)
 	ingredientController := controller.NewIngredientController(ingredientRepository)
 
 	router := mux.NewRouter().StrictSlash(true)

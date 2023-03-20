@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -33,176 +34,188 @@ func (rc *RecipeController) RecipeRoutes(router *mux.Router) {
 }
 
 func (rc *RecipeController) allRecipes(w http.ResponseWriter, r *http.Request) {
-	recipes, err := rc.recipeRepository.GetAll()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+	HandleRequest(func(ctx context.Context) {
+		recipes, err := rc.recipeRepository.GetAll(ctx)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 
-	// TODO pagination
-	response := response.GetRecipesResponse{Recipes: recipes}
-	json.NewEncoder(w).Encode(response)
+		// TODO pagination
+		response := response.GetRecipesResponse{Recipes: recipes}
+		json.NewEncoder(w).Encode(response)
+	})
 }
 
 func (rc *RecipeController) getRecipe(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	HandleRequest(func(ctx context.Context) {
+		vars := mux.Vars(r)
+		id := vars["id"]
 
-	recipe, found, err := rc.recipeRepository.GetById(id)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	} else if !found {
-		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-		return
-	}
+		recipe, found, err := rc.recipeRepository.GetById(ctx, id)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		} else if !found {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
 
-	json.NewEncoder(w).Encode(recipe)
+		json.NewEncoder(w).Encode(recipe)
+	})
 }
 
 func (rc *RecipeController) createRecipe(w http.ResponseWriter, r *http.Request) {
-	var createRecipeRequest request.CreateRecipeRequest
-	json.NewDecoder(r.Body).Decode(&createRecipeRequest)
+	HandleRequest(func(ctx context.Context) {
+		var createRecipeRequest request.CreateRecipeRequest
+		json.NewDecoder(r.Body).Decode(&createRecipeRequest)
 
-	if !request.CanCreateRecipe(&createRecipeRequest) {
-		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
-		return
-	}
+		if !request.CanCreateRecipe(&createRecipeRequest) {
+			http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+			return
+		}
 
-	var newRecipe model.Recipe
+		var newRecipe model.Recipe
 
-	newRecipe.Title = strings.TrimSpace(createRecipeRequest.Title)
-	if createRecipeRequest.Description != nil {
-		*newRecipe.Description = strings.TrimSpace(*createRecipeRequest.Description)
-	}
-	newRecipe.Ingredients = createRecipeRequest.Ingredients
-	newRecipe.Steps = createRecipeRequest.Steps
+		newRecipe.Title = strings.TrimSpace(createRecipeRequest.Title)
+		if createRecipeRequest.Description != nil {
+			*newRecipe.Description = strings.TrimSpace(*createRecipeRequest.Description)
+		}
+		newRecipe.Ingredients = createRecipeRequest.Ingredients
+		newRecipe.Steps = createRecipeRequest.Steps
 
-	// TODO handle creation time in controllers, repositories, or on the db?
-	newRecipe.Created = new(time.Time)
-	*newRecipe.Created = time.Now()
+		// TODO handle creation time in controllers, repositories, or on the db?
+		newRecipe.Created = new(time.Time)
+		*newRecipe.Created = time.Now()
 
-	recipe, err := rc.recipeRepository.Create(newRecipe)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+		recipe, err := rc.recipeRepository.Create(ctx, newRecipe)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 
-	json.NewEncoder(w).Encode(recipe)
+		json.NewEncoder(w).Encode(recipe)
+	})
 }
 
 func (rc *RecipeController) replaceRecipe(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	HandleRequest(func(ctx context.Context) {
+		vars := mux.Vars(r)
+		id := vars["id"]
 
-	recipe, found, err := rc.recipeRepository.GetById(id)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	} else if !found {
-		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-		return
-	}
+		recipe, found, err := rc.recipeRepository.GetById(ctx, id)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		} else if !found {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
 
-	var replaceRecipeRequest request.CreateRecipeRequest
-	json.NewDecoder(r.Body).Decode(&replaceRecipeRequest)
+		var replaceRecipeRequest request.CreateRecipeRequest
+		json.NewDecoder(r.Body).Decode(&replaceRecipeRequest)
 
-	if !request.CanCreateRecipe(&replaceRecipeRequest) {
-		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
-		return
-	}
+		if !request.CanCreateRecipe(&replaceRecipeRequest) {
+			http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+			return
+		}
 
-	recipe.Title = strings.TrimSpace(replaceRecipeRequest.Title)
-	if replaceRecipeRequest.Description != nil {
-		*recipe.Description = strings.TrimSpace(*replaceRecipeRequest.Description)
-	} else {
-		recipe.Description = nil
-	}
-	recipe.Ingredients = replaceRecipeRequest.Ingredients
-	recipe.Steps = replaceRecipeRequest.Steps
+		recipe.Title = strings.TrimSpace(replaceRecipeRequest.Title)
+		if replaceRecipeRequest.Description != nil {
+			*recipe.Description = strings.TrimSpace(*replaceRecipeRequest.Description)
+		} else {
+			recipe.Description = nil
+		}
+		recipe.Ingredients = replaceRecipeRequest.Ingredients
+		recipe.Steps = replaceRecipeRequest.Steps
 
-	// TODO handle lastModified time in controllers, repositories, or on the db?
-	recipe.LastModified = new(time.Time)
-	*recipe.LastModified = time.Now()
+		// TODO handle lastModified time in controllers, repositories, or on the db?
+		recipe.LastModified = new(time.Time)
+		*recipe.LastModified = time.Now()
 
-	updatedRecipe, err := rc.recipeRepository.Update(*recipe)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+		updatedRecipe, err := rc.recipeRepository.Update(ctx, *recipe)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 
-	json.NewEncoder(w).Encode(updatedRecipe)
+		json.NewEncoder(w).Encode(updatedRecipe)
+	})
 }
 
 func (rc *RecipeController) updateRecipe(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	HandleRequest(func(ctx context.Context) {
+		vars := mux.Vars(r)
+		id := vars["id"]
 
-	recipe, found, err := rc.recipeRepository.GetById(id)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	} else if !found {
-		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-		return
-	}
+		recipe, found, err := rc.recipeRepository.GetById(ctx, id)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		} else if !found {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
 
-	var updateRecipeRequest request.UpdateRecipeRequest
-	json.NewDecoder(r.Body).Decode(&updateRecipeRequest)
+		var updateRecipeRequest request.UpdateRecipeRequest
+		json.NewDecoder(r.Body).Decode(&updateRecipeRequest)
 
-	if !request.CanUpdateRecipe(&updateRecipeRequest) {
-		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
-		return
-	}
+		if !request.CanUpdateRecipe(&updateRecipeRequest) {
+			http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+			return
+		}
 
-	if updateRecipeRequest.Title != nil {
-		recipe.Title = strings.TrimSpace(*updateRecipeRequest.Title)
-	}
+		if updateRecipeRequest.Title != nil {
+			recipe.Title = strings.TrimSpace(*updateRecipeRequest.Title)
+		}
 
-	if updateRecipeRequest.Description != nil {
-		*recipe.Description = strings.TrimSpace(*updateRecipeRequest.Description)
-	}
+		if updateRecipeRequest.Description != nil {
+			*recipe.Description = strings.TrimSpace(*updateRecipeRequest.Description)
+		}
 
-	if updateRecipeRequest.Ingredients != nil {
-		recipe.Ingredients = *updateRecipeRequest.Ingredients
-	}
+		if updateRecipeRequest.Ingredients != nil {
+			recipe.Ingredients = *updateRecipeRequest.Ingredients
+		}
 
-	if updateRecipeRequest.Steps != nil {
-		recipe.Steps = *updateRecipeRequest.Steps
-	}
+		if updateRecipeRequest.Steps != nil {
+			recipe.Steps = *updateRecipeRequest.Steps
+		}
 
-	// TODO handle lastModified time in controllers or repositories?
-	recipe.LastModified = new(time.Time)
-	*recipe.LastModified = time.Now()
+		// TODO handle lastModified time in controllers or repositories?
+		recipe.LastModified = new(time.Time)
+		*recipe.LastModified = time.Now()
 
-	updatedRecipe, err := rc.recipeRepository.Update(*recipe)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+		updatedRecipe, err := rc.recipeRepository.Update(ctx, *recipe)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 
-	json.NewEncoder(w).Encode(updatedRecipe)
+		json.NewEncoder(w).Encode(updatedRecipe)
+	})
 }
 
 func (rc *RecipeController) deleteRecipe(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	HandleRequest(func(ctx context.Context) {
+		vars := mux.Vars(r)
+		id := vars["id"]
 
-	recipe, found, err := rc.recipeRepository.GetById(id)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	} else if !found {
-		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-		return
-	}
+		recipe, found, err := rc.recipeRepository.GetById(ctx, id)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		} else if !found {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
 
-	deletedId, err := rc.recipeRepository.Delete(recipe.Id)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+		deletedId, err := rc.recipeRepository.Delete(ctx, recipe.Id)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 
-	deleteRecipeResponse := response.DeleteRecipeResponse{Id: deletedId}
-	json.NewEncoder(w).Encode(deleteRecipeResponse)
+		deleteRecipeResponse := response.DeleteRecipeResponse{Id: deletedId}
+		json.NewEncoder(w).Encode(deleteRecipeResponse)
+	})
 }

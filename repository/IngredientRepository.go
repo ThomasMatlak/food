@@ -11,17 +11,15 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 )
 
-// TODO don't store context in structs https://pkg.go.dev/context#section-documentation
 type IngredientRepository struct {
-	ctx    context.Context
 	driver neo4j.DriverWithContext
 }
 
-func NewIngredientRepository(ctx context.Context, driver neo4j.DriverWithContext) *IngredientRepository {
-	return &IngredientRepository{ctx: ctx, driver: driver}
+func NewIngredientRepository(driver neo4j.DriverWithContext) *IngredientRepository {
+	return &IngredientRepository{driver: driver}
 }
 
-func (r *IngredientRepository) GetAll() ([]model.Ingredient, error) {
+func (r *IngredientRepository) GetAll(ctx context.Context) ([]model.Ingredient, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) ([]model.Ingredient, error) {
 		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Ingredient, error) {
 			*query = fmt.Sprintf("MATCH (i:`%s`) WHERE i.deleted IS NULL\n"+
@@ -60,10 +58,10 @@ func (r *IngredientRepository) GetAll() ([]model.Ingredient, error) {
 		})
 	}
 
-	return RunQuery(r.ctx, r.driver, "get all ingredients", work)
+	return RunQuery(ctx, r.driver, "get all ingredients", work)
 }
 
-func (r *IngredientRepository) GetById(id string) (*model.Ingredient, bool, error) {
+func (r *IngredientRepository) GetById(ctx context.Context, id string) (*model.Ingredient, bool, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Ingredient, error) {
 		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
 			*query = fmt.Sprintf("%s WHERE i.deleted IS NULL\n"+
@@ -87,7 +85,7 @@ func (r *IngredientRepository) GetById(id string) (*model.Ingredient, bool, erro
 		})
 	}
 
-	ingredient, err := RunQuery(r.ctx, r.driver, "get ingredient", work)
+	ingredient, err := RunQuery(ctx, r.driver, "get ingredient", work)
 
 	if err != nil && err.Error() == "Result contains no more records" {
 		return nil, false, nil
@@ -99,7 +97,7 @@ func (r *IngredientRepository) GetById(id string) (*model.Ingredient, bool, erro
 	return ingredient, true, nil
 }
 
-func (r *IngredientRepository) Create(ingredient model.Ingredient) (*model.Ingredient, error) {
+func (r *IngredientRepository) Create(ctx context.Context, ingredient model.Ingredient) (*model.Ingredient, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Ingredient, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
 			// TODO different id function?
@@ -125,10 +123,10 @@ func (r *IngredientRepository) Create(ingredient model.Ingredient) (*model.Ingre
 		})
 	}
 
-	return RunQuery(r.ctx, r.driver, "create ingredient", work)
+	return RunQuery(ctx, r.driver, "create ingredient", work)
 }
 
-func (r *IngredientRepository) Update(ingredient model.Ingredient) (*model.Ingredient, error) {
+func (r *IngredientRepository) Update(ctx context.Context, ingredient model.Ingredient) (*model.Ingredient, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Ingredient, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
 			*query = fmt.Sprintf("%s SET i.name = $name, i.lastModified = $lastModified\n"+
@@ -154,10 +152,10 @@ func (r *IngredientRepository) Update(ingredient model.Ingredient) (*model.Ingre
 		})
 	}
 
-	return RunQuery(r.ctx, r.driver, "update ingredient", work)
+	return RunQuery(ctx, r.driver, "update ingredient", work)
 }
 
-func (r *IngredientRepository) Delete(id string) (string, error) {
+func (r *IngredientRepository) Delete(ctx context.Context, id string) (string, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (string, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
 			*query = fmt.Sprintf("%s MATCH (i)-[rel]-(:`%s`) WHERE rel.deleted IS NULL\n"+
@@ -183,7 +181,7 @@ func (r *IngredientRepository) Delete(id string) (string, error) {
 		})
 	}
 
-	return RunQuery(r.ctx, r.driver, "delete ingredient", work)
+	return RunQuery(ctx, r.driver, "delete ingredient", work)
 }
 
 func ParseIngredientNode(node dbtype.Node) (*model.Ingredient, error) {

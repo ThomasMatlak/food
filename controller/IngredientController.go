@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -33,133 +34,145 @@ func (rc *IngredientController) IngredientRoutes(router *mux.Router) {
 }
 
 func (ic *IngredientController) allIngredients(w http.ResponseWriter, r *http.Request) {
-	ingredients, err := ic.ingredientRepository.GetAll()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+	HandleRequest(func(ctx context.Context) {
+		ingredients, err := ic.ingredientRepository.GetAll(ctx)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 
-	// TODO pagination
-	response := response.GetIngredientsResponse{Ingredients: ingredients}
-	json.NewEncoder(w).Encode(response)
+		// TODO pagination
+		response := response.GetIngredientsResponse{Ingredients: ingredients}
+		json.NewEncoder(w).Encode(response)
+	})
 }
 
 func (ic *IngredientController) getIngredient(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	HandleRequest(func(ctx context.Context) {
+		vars := mux.Vars(r)
+		id := vars["id"]
 
-	ingredient, found, err := ic.ingredientRepository.GetById(id)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	} else if !found {
-		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-		return
-	}
+		ingredient, found, err := ic.ingredientRepository.GetById(ctx, id)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		} else if !found {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
 
-	json.NewEncoder(w).Encode(ingredient)
+		json.NewEncoder(w).Encode(ingredient)
+	})
 }
 
 func (ic *IngredientController) createIngredient(w http.ResponseWriter, r *http.Request) {
-	var createIngredientRequest request.CreateIngredientRequest
-	json.NewDecoder(r.Body).Decode(&createIngredientRequest)
+	HandleRequest(func(ctx context.Context) {
+		var createIngredientRequest request.CreateIngredientRequest
+		json.NewDecoder(r.Body).Decode(&createIngredientRequest)
 
-	var newIngredient model.Ingredient
-	newIngredient.Name = strings.TrimSpace(createIngredientRequest.Name)
+		var newIngredient model.Ingredient
+		newIngredient.Name = strings.TrimSpace(createIngredientRequest.Name)
 
-	newIngredient.Created = new(time.Time)
-	*newIngredient.Created = time.Now()
+		newIngredient.Created = new(time.Time)
+		*newIngredient.Created = time.Now()
 
-	ingredient, err := ic.ingredientRepository.Create(newIngredient)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+		ingredient, err := ic.ingredientRepository.Create(ctx, newIngredient)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 
-	json.NewEncoder(w).Encode(ingredient)
+		json.NewEncoder(w).Encode(ingredient)
+	})
 }
 
 func (ic *IngredientController) replaceIngredient(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	HandleRequest(func(ctx context.Context) {
+		vars := mux.Vars(r)
+		id := vars["id"]
 
-	ingredient, found, err := ic.ingredientRepository.GetById(id)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	} else if !found {
-		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-		return
-	}
+		ingredient, found, err := ic.ingredientRepository.GetById(ctx, id)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		} else if !found {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
 
-	var replaceIngredientRequest request.CreateIngredientRequest
-	json.NewDecoder(r.Body).Decode(&replaceIngredientRequest)
+		var replaceIngredientRequest request.CreateIngredientRequest
+		json.NewDecoder(r.Body).Decode(&replaceIngredientRequest)
 
-	ingredient.Name = strings.TrimSpace(replaceIngredientRequest.Name)
+		ingredient.Name = strings.TrimSpace(replaceIngredientRequest.Name)
 
-	ingredient.LastModified = new(time.Time)
-	*ingredient.LastModified = time.Now()
+		ingredient.LastModified = new(time.Time)
+		*ingredient.LastModified = time.Now()
 
-	updatedIngredient, err := ic.ingredientRepository.Update(*ingredient)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+		updatedIngredient, err := ic.ingredientRepository.Update(ctx, *ingredient)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 
-	json.NewEncoder(w).Encode(updatedIngredient)
+		json.NewEncoder(w).Encode(updatedIngredient)
+	})
 }
 
 func (ic *IngredientController) updateIngredient(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	HandleRequest(func(ctx context.Context) {
+		vars := mux.Vars(r)
+		id := vars["id"]
 
-	ingredient, found, err := ic.ingredientRepository.GetById(id)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	} else if !found {
-		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-		return
-	}
+		ingredient, found, err := ic.ingredientRepository.GetById(ctx, id)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		} else if !found {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
 
-	var replaceIngredientRequest request.UpdateIngredientRequest
-	json.NewDecoder(r.Body).Decode(&replaceIngredientRequest)
+		var replaceIngredientRequest request.UpdateIngredientRequest
+		json.NewDecoder(r.Body).Decode(&replaceIngredientRequest)
 
-	if replaceIngredientRequest.Name != nil {
-		ingredient.Name = strings.TrimSpace(*replaceIngredientRequest.Name)
-	}
+		if replaceIngredientRequest.Name != nil {
+			ingredient.Name = strings.TrimSpace(*replaceIngredientRequest.Name)
+		}
 
-	ingredient.LastModified = new(time.Time)
-	*ingredient.LastModified = time.Now()
+		ingredient.LastModified = new(time.Time)
+		*ingredient.LastModified = time.Now()
 
-	updatedIngredient, err := ic.ingredientRepository.Update(*ingredient)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+		updatedIngredient, err := ic.ingredientRepository.Update(ctx, *ingredient)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 
-	json.NewEncoder(w).Encode(updatedIngredient)
+		json.NewEncoder(w).Encode(updatedIngredient)
+	})
 }
 
 func (ic *IngredientController) deleteIngredient(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	HandleRequest(func(ctx context.Context) {
+		vars := mux.Vars(r)
+		id := vars["id"]
 
-	ingredient, found, err := ic.ingredientRepository.GetById(id)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	} else if !found {
-		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-		return
-	}
+		ingredient, found, err := ic.ingredientRepository.GetById(ctx, id)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		} else if !found {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
 
-	deletedId, err := ic.ingredientRepository.Delete(ingredient.Id)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+		deletedId, err := ic.ingredientRepository.Delete(ctx, ingredient.Id)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
 
-	deleteIngredientResponse := response.DeleteIngredientResponse{Id: deletedId}
-	json.NewEncoder(w).Encode(deleteIngredientResponse)
+		deleteIngredientResponse := response.DeleteIngredientResponse{Id: deletedId}
+		json.NewEncoder(w).Encode(deleteIngredientResponse)
+	})
 }

@@ -1,5 +1,7 @@
 package model
 
+import "context"
+
 type Ingredient struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
@@ -8,9 +10,9 @@ type Ingredient struct {
 }
 
 type IngredientRepository interface {
-	GetAll() ([]Ingredient, error)
-	GetById(id string) (*Ingredient, bool, error)
-	Create(Ingredient) (*Ingredient, error)
-	Update(Ingredient) (*Ingredient, error)
-	Delete(id string) (string, error)
+	GetAll(ctx context.Context) ([]Ingredient, error)
+	GetById(ctx context.Context, id string) (*Ingredient, bool, error)
+	Create(ctx context.Context, ingredient Ingredient) (*Ingredient, error)
+	Update(ctx context.Context, ingredient Ingredient) (*Ingredient, error)
+	Delete(ctx context.Context, id string) (string, error)
 }

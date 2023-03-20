@@ -13,17 +13,15 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 )
 
-// TODO don't store context in structs https://pkg.go.dev/context#section-documentation
 type RecipeRepository struct {
-	ctx    context.Context
 	driver neo4j.DriverWithContext
 }
 
-func NewRecipeRepository(ctx context.Context, driver neo4j.DriverWithContext) *RecipeRepository {
-	return &RecipeRepository{ctx: ctx, driver: driver}
+func NewRecipeRepository(driver neo4j.DriverWithContext) *RecipeRepository {
+	return &RecipeRepository{driver: driver}
 }
 
-func (r *RecipeRepository) GetAll() ([]model.Recipe, error) {
+func (r *RecipeRepository) GetAll(ctx context.Context) ([]model.Recipe, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) ([]model.Recipe, error) {
 		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Recipe, error) {
 			*query = fmt.Sprintf("MATCH (r:`%s`) WHERE r.deleted IS NULL\n"+
@@ -76,10 +74,10 @@ func (r *RecipeRepository) GetAll() ([]model.Recipe, error) {
 		})
 	}
 
-	return RunQuery(r.ctx, r.driver, "get all recipes", work)
+	return RunQuery(ctx, r.driver, "get all recipes", work)
 }
 
-func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
+func (r *RecipeRepository) GetById(ctx context.Context, id string) (*model.Recipe, bool, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Recipe, error) {
 		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 			*query = fmt.Sprintf("%s WHERE r.deleted IS NULL\n"+
@@ -120,7 +118,7 @@ func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
 		})
 	}
 
-	recipe, err := RunQuery(r.ctx, r.driver, "get recipe", work)
+	recipe, err := RunQuery(ctx, r.driver, "get recipe", work)
 
 	if err != nil && err.Error() == "Result contains no more records" {
 		return nil, false, nil
@@ -131,7 +129,7 @@ func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
 	return recipe, true, nil
 }
 
-func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
+func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*model.Recipe, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Recipe, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 			relateIngredientStmts := []string{}
@@ -197,13 +195,13 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 		})
 	}
 
-	return RunQuery(r.ctx, r.driver, "create recipe", work)
+	return RunQuery(ctx, r.driver, "create recipe", work)
 }
 
-func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
+func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*model.Recipe, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Recipe, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
-			existingRecipe, found, err := r.GetById(recipe.Id)
+			existingRecipe, found, err := r.GetById(ctx, recipe.Id)
 			if !found && err != nil {
 				return nil, err
 			} else if !found {
@@ -316,11 +314,11 @@ func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
 		})
 	}
 
-	return RunQuery(r.ctx, r.driver, "update recipe", work)
+	return RunQuery(ctx, r.driver, "update recipe", work)
 }
 
 // TODO return *string?
-func (r *RecipeRepository) Delete(id string) (string, error) {
+func (r *RecipeRepository) Delete(ctx context.Context, id string) (string, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (string, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
 			// TODO apply a Deleted label (and filter that :Resources are not also :Deleted)?
@@ -347,7 +345,7 @@ func (r *RecipeRepository) Delete(id string) (string, error) {
 		})
 	}
 
-	return RunQuery(r.ctx, r.driver, "delete recipe", work)
+	return RunQuery(ctx, r.driver, "delete recipe", work)
 }
 
 func ParseRecipeNode(node dbtype.Node) (*model.Recipe, error) {
