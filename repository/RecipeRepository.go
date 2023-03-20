@@ -11,6 +11,7 @@ import (
 	"github.com/ThomasMatlak/food/util"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
+	"github.com/rs/zerolog/log"
 )
 
 // TODO don't store context in structs https://pkg.go.dev/context#section-documentation
@@ -27,17 +28,17 @@ func (r *RecipeRepository) GetAll() ([]model.Recipe, error) {
 	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(r.ctx)
 
-	return neo4j.ExecuteRead(r.ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Recipe, error) {
-		query := fmt.Sprintf("MATCH (r:`%s`) WHERE r.deleted IS NULL\n"+
+	// TODO wrapper for logging query results
+	var query string
+	var params map[string]any
+
+	recipes, err := neo4j.ExecuteRead(r.ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Recipe, error) {
+		query = fmt.Sprintf("MATCH (r:`%s`) WHERE r.deleted IS NULL\n"+
 			"MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
 			"RETURN r AS recipe, collect(ci) AS rels",
 			RecipeLabel,
 			ContainsIngredientLabel, IngredientLabel)
-		params := map[string]any{}
-
-		// TODO use an actual logger
-		fmt.Println(query)
-		fmt.Println(params)
+		params = map[string]any{}
 
 		result, err := tx.Run(r.ctx, query, params)
 		if err != nil {
@@ -80,24 +81,27 @@ func (r *RecipeRepository) GetAll() ([]model.Recipe, error) {
 
 		return recipes, nil
 	})
+
+	log.Debug().Str("query", query).Any("params", params).Any("result", recipes).Err(err).Msg("get all recipes")
+	return recipes, err
 }
 
 func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
 	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(r.ctx)
 
+	var query string
+	var params map[string]any
+
 	recipe, err := neo4j.ExecuteRead(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
-		query := fmt.Sprintf("%s WHERE r.deleted IS NULL\n"+
+		query = fmt.Sprintf("%s WHERE r.deleted IS NULL\n"+
 			"MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
 			"RETURN r AS recipe, collect(ci) AS rels",
 			MatchNodeById("r", []string{RecipeLabel}),
 			ContainsIngredientLabel, IngredientLabel)
-		params := map[string]any{
+		params = map[string]any{
 			"rId": id,
 		}
-
-		fmt.Println(query)
-		fmt.Println(params)
 
 		record, err := RunAndReturnSingleRecord(r.ctx, tx, query, params)
 		if err != nil {
@@ -127,6 +131,8 @@ func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
 		return recipe, nil
 	})
 
+	log.Debug().Str("query", query).Any("params", params).Any("result", recipe).Err(err).Msg("get recipe")
+
 	if err != nil && err.Error() == "Result contains no more records" {
 		return nil, false, nil
 	} else if err != nil {
@@ -140,7 +146,10 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(r.ctx)
 
-	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
+	var query string
+	var params map[string]any
+
+	createdRecipe, err := neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 		relateIngredientStmts := []string{}
 		ingredientIdParams := map[string]any{}
 		for i, containsIngredient := range recipe.Ingredients {
@@ -158,14 +167,14 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 		}
 
 		// TODO different id function?
-		query := fmt.Sprintf("CREATE (r:`%s`:`%s`) SET r = {id: toString(id(r)), title: $title, description: $description, steps: $steps, created: $created}\n"+
+		query = fmt.Sprintf("CREATE (r:`%s`:`%s`) SET r = {id: toString(id(r)), title: $title, description: $description, steps: $steps, created: $created}\n"+
 			"WITH r %s\n"+
 			"WITH r MATCH (r)-[ci:`%s`]->(:`%s`)\n"+ // the node and relationships have just been created, so no need to check they are not deleted
 			"RETURN r AS recipe, collect(ci) AS rels",
 			RecipeLabel, ResourceLabel,
 			strings.Join(relateIngredientStmts, "\nWITH r "),
 			ContainsIngredientLabel, IngredientLabel)
-		params := map[string]any{
+		params = map[string]any{
 			"title":       recipe.Title,
 			"description": recipe.Description,
 			"steps":       recipe.Steps,
@@ -174,9 +183,6 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 		for k, v := range ingredientIdParams {
 			params[k] = v
 		}
-
-		fmt.Println(query)
-		fmt.Println(params)
 
 		record, err := RunAndReturnSingleRecord(r.ctx, tx, query, params)
 		if err != nil {
@@ -205,13 +211,19 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 		}
 		return recipe, nil
 	})
+
+	log.Debug().Str("query", query).Any("params", params).Any("result", createdRecipe).Err(err).Msg("create recipe")
+	return createdRecipe, err
 }
 
 func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
 	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(r.ctx)
 
-	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
+	var query string
+	var params map[string]any
+
+	updatedRecipe, err := neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 		// TODO do on the db, if possible; very large ingredient lists could cause performance issues in the application
 
 		existingRecipe, found, err := r.GetById(recipe.Id)
@@ -279,14 +291,14 @@ func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
 
 		relStmts := append(append(unRelateIngredientStms, addIngredientStms...), updateIngredientStms...)
 
-		query := fmt.Sprintf("%s SET r += {title: $title, description: $description, steps: $steps, lastModified: $lastModified}\n"+
+		query = fmt.Sprintf("%s SET r += {title: $title, description: $description, steps: $steps, lastModified: $lastModified}\n"+
 			"WITH r %s\n"+
 			"WITH r MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
 			"RETURN r AS recipe, collect(ci) AS rels",
 			MatchNodeById("r", []string{RecipeLabel}),
 			strings.Join(relStmts, "\nWITH r "),
 			ContainsIngredientLabel, IngredientLabel)
-		params := map[string]any{
+		params = map[string]any{
 			"rId":          recipe.Id,
 			"description":  recipe.Description,
 			"title":        recipe.Title,
@@ -296,9 +308,6 @@ func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
 		for k, v := range ingredientIdParams {
 			params[k] = v
 		}
-
-		fmt.Println(query)
-		fmt.Println(params)
 
 		record, err := RunAndReturnSingleRecord(r.ctx, tx, query, params)
 		if err != nil {
@@ -327,25 +336,28 @@ func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
 		}
 		return recipe, nil
 	})
+
+	log.Debug().Str("query", query).Any("params", params).Any("result", updatedRecipe).Err(err).Msg("update recipe")
+	return updatedRecipe, err
 }
 
 func (r *RecipeRepository) Delete(id string) (string, error) {
 	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(r.ctx)
 
-	return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
+	var query string
+	var params map[string]any
+
+	deletedId, err := neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
 		// TODO apply a Deleted label (and filter that :Resources are not also :Deleted)?
-		query := fmt.Sprintf("%s MATCH (r)-[rel]-(:`%s`) WHERE rel.deleted IS NULL\n"+
+		query = fmt.Sprintf("%s MATCH (r)-[rel]-(:`%s`) WHERE rel.deleted IS NULL\n"+
 			"SET r.deleted = $deleted, rel.deleted = $deleted\n"+
 			"WITH r RETURN r.id AS id",
 			MatchNodeById("r", []string{RecipeLabel}), ResourceLabel)
-		params := map[string]any{
+		params = map[string]any{
 			"rId":     id,
 			"deleted": neo4j.LocalDateTime(time.Now()),
 		}
-
-		fmt.Println(query)
-		fmt.Println(params)
 
 		record, err := RunAndReturnSingleRecord(r.ctx, tx, query, params)
 		if err != nil {
@@ -359,6 +371,10 @@ func (r *RecipeRepository) Delete(id string) (string, error) {
 
 		return deletedId, nil
 	})
+
+	// TODO log deleted rels?
+	log.Debug().Str("query", query).Any("params", params).Any("result", deletedId).Err(err).Msg("delete recipe")
+	return deletedId, err
 }
 
 func ParseRecipeNode(node dbtype.Node) (*model.Recipe, error) {
