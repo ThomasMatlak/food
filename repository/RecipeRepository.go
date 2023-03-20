@@ -24,11 +24,8 @@ func NewRecipeRepository(ctx context.Context, driver neo4j.DriverWithContext) *R
 }
 
 func (r *RecipeRepository) GetAll() ([]model.Recipe, error) {
-	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(r.ctx)
-
-	work := func(query *string, params *map[string]any) ([]model.Recipe, error) {
-		return neo4j.ExecuteRead(r.ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Recipe, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) ([]model.Recipe, error) {
+		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Recipe, error) {
 			*query = fmt.Sprintf("MATCH (r:`%s`) WHERE r.deleted IS NULL\n"+
 				"MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
 				"RETURN r AS recipe, collect(ci) AS rels",
@@ -36,12 +33,12 @@ func (r *RecipeRepository) GetAll() ([]model.Recipe, error) {
 				ContainsIngredientLabel, IngredientLabel)
 			*params = map[string]any{}
 
-			result, err := tx.Run(r.ctx, *query, *params)
+			result, err := tx.Run(ctx, *query, *params)
 			if err != nil {
 				return nil, err
 			}
 
-			records, err := result.Collect(r.ctx)
+			records, err := result.Collect(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -79,15 +76,12 @@ func (r *RecipeRepository) GetAll() ([]model.Recipe, error) {
 		})
 	}
 
-	return RunQuery("get all recipes", work)
+	return RunQuery(r.ctx, r.driver, "get all recipes", work)
 }
 
 func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
-	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(r.ctx)
-
-	work := func(query *string, params *map[string]any) (*model.Recipe, error) {
-		return neo4j.ExecuteRead(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Recipe, error) {
+		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 			*query = fmt.Sprintf("%s WHERE r.deleted IS NULL\n"+
 				"MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
 				"RETURN r AS recipe, collect(ci) AS rels",
@@ -97,7 +91,7 @@ func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
 				"rId": id,
 			}
 
-			record, err := RunAndReturnSingleRecord(r.ctx, tx, *query, *params)
+			record, err := RunAndReturnSingleRecord(ctx, tx, *query, *params)
 			if err != nil {
 				return nil, err
 			}
@@ -126,7 +120,7 @@ func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
 		})
 	}
 
-	recipe, err := RunQuery("get recipe", work)
+	recipe, err := RunQuery(r.ctx, r.driver, "get recipe", work)
 
 	if err != nil && err.Error() == "Result contains no more records" {
 		return nil, false, nil
@@ -138,11 +132,8 @@ func (r *RecipeRepository) GetById(id string) (*model.Recipe, bool, error) {
 }
 
 func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
-	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(r.ctx)
-
-	work := func(query *string, params *map[string]any) (*model.Recipe, error) {
-		return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Recipe, error) {
+		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 			relateIngredientStmts := []string{}
 			ingredientIdParams := map[string]any{}
 			for i, containsIngredient := range recipe.Ingredients {
@@ -177,7 +168,7 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 				(*params)[k] = v
 			}
 
-			record, err := RunAndReturnSingleRecord(r.ctx, tx, *query, *params)
+			record, err := RunAndReturnSingleRecord(ctx, tx, *query, *params)
 			if err != nil {
 				return nil, err
 			}
@@ -206,15 +197,12 @@ func (r *RecipeRepository) Create(recipe model.Recipe) (*model.Recipe, error) {
 		})
 	}
 
-	return RunQuery("create recipe", work)
+	return RunQuery(r.ctx, r.driver, "create recipe", work)
 }
 
 func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
-	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(r.ctx)
-
-	work := func(query *string, params *map[string]any) (*model.Recipe, error) {
-		return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Recipe, error) {
+		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 			existingRecipe, found, err := r.GetById(recipe.Id)
 			if !found && err != nil {
 				return nil, err
@@ -299,7 +287,7 @@ func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
 				(*params)[k] = v
 			}
 
-			record, err := RunAndReturnSingleRecord(r.ctx, tx, *query, *params)
+			record, err := RunAndReturnSingleRecord(ctx, tx, *query, *params)
 			if err != nil {
 				return nil, err
 			}
@@ -328,16 +316,13 @@ func (r *RecipeRepository) Update(recipe model.Recipe) (*model.Recipe, error) {
 		})
 	}
 
-	return RunQuery("update recipe", work)
+	return RunQuery(r.ctx, r.driver, "update recipe", work)
 }
 
 // TODO return *string?
 func (r *RecipeRepository) Delete(id string) (string, error) {
-	session := r.driver.NewSession(r.ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(r.ctx)
-
-	work := func(query *string, params *map[string]any) (string, error) {
-		return neo4j.ExecuteWrite(r.ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (string, error) {
+		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
 			// TODO apply a Deleted label (and filter that :Resources are not also :Deleted)?
 			*query = fmt.Sprintf("%s MATCH (r)-[rel]-(:`%s`) WHERE rel.deleted IS NULL\n"+
 				"SET r.deleted = $deleted, rel.deleted = $deleted\n"+
@@ -348,7 +333,7 @@ func (r *RecipeRepository) Delete(id string) (string, error) {
 				"deleted": neo4j.LocalDateTime(time.Now()),
 			}
 
-			record, err := RunAndReturnSingleRecord(r.ctx, tx, *query, *params)
+			record, err := RunAndReturnSingleRecord(ctx, tx, *query, *params)
 			if err != nil {
 				return "", err
 			}
@@ -362,7 +347,7 @@ func (r *RecipeRepository) Delete(id string) (string, error) {
 		})
 	}
 
-	return RunQuery("delete recipe", work)
+	return RunQuery(r.ctx, r.driver, "delete recipe", work)
 }
 
 func ParseRecipeNode(node dbtype.Node) (*model.Recipe, error) {

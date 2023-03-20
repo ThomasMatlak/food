@@ -13,14 +13,19 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// TODO accept context and driver
-func RunQuery[T any](action string, work func(*string, *map[string]any) (T, error)) (T, error) {
-	// TODO create session
+func RunQuery[T any](
+	ctx context.Context,
+	driver neo4j.DriverWithContext, // TODO *neo4j.DriverWithContext?
+	action string,
+	work func(context.Context, neo4j.SessionWithContext, *string, *map[string]any) (T, error),
+) (T, error) {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(ctx)
+
 	var query string
 	var params map[string]any
 
-	// TODO pass context and session to work()
-	result, err := work(&query, &params)
+	result, err := work(ctx, session, &query, &params)
 
 	log.Debug().
 		Str("action", action).
