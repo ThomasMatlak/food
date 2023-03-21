@@ -20,14 +20,14 @@ func NewIngredientRepository(driver neo4j.DriverWithContext) *IngredientReposito
 }
 
 func (r *IngredientRepository) GetAll(ctx context.Context) ([]model.Ingredient, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) ([]model.Ingredient, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) ([]model.Ingredient, error) {
 		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Ingredient, error) {
 			*query = fmt.Sprintf("MATCH (i:`%s`) WHERE i.deleted IS NULL\n"+
 				"RETURN i",
 				IngredientLabel)
-			*params = map[string]any{}
+			params = map[string]any{}
 
-			result, err := tx.Run(ctx, *query, *params)
+			result, err := tx.Run(ctx, *query, params)
 			if err != nil {
 				return nil, err
 			}
@@ -62,16 +62,16 @@ func (r *IngredientRepository) GetAll(ctx context.Context) ([]model.Ingredient, 
 }
 
 func (r *IngredientRepository) GetById(ctx context.Context, id string) (*model.Ingredient, bool, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Ingredient, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Ingredient, error) {
 		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
 			*query = fmt.Sprintf("%s WHERE i.deleted IS NULL\n"+
 				"RETURN i",
 				MatchNodeById("i", []string{IngredientLabel}))
-			*params = map[string]any{
+			params = map[string]any{
 				"iId": id,
 			}
 
-			record, err := RunAndReturnSingleRecord(ctx, tx, *query, *params)
+			record, err := RunAndReturnSingleRecord(ctx, tx, *query, params)
 			if err != nil {
 				return nil, err
 			}
@@ -98,18 +98,18 @@ func (r *IngredientRepository) GetById(ctx context.Context, id string) (*model.I
 }
 
 func (r *IngredientRepository) Create(ctx context.Context, ingredient model.Ingredient) (*model.Ingredient, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Ingredient, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Ingredient, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
 			// TODO different id function?
 			*query = fmt.Sprintf("CREATE (i:`%s`:`%s`) SET i.id = toString(id(i)), i.name = $name, i.created = $created\n"+
 				"RETURN i",
 				IngredientLabel, ResourceLabel)
-			*params = map[string]any{
+			params = map[string]any{
 				"name":    ingredient.Name,
 				"created": neo4j.LocalDateTime(*ingredient.Created),
 			}
 
-			record, err := RunAndReturnSingleRecord(ctx, tx, *query, *params)
+			record, err := RunAndReturnSingleRecord(ctx, tx, *query, params)
 			if err != nil {
 				return nil, err
 			}
@@ -127,18 +127,18 @@ func (r *IngredientRepository) Create(ctx context.Context, ingredient model.Ingr
 }
 
 func (r *IngredientRepository) Update(ctx context.Context, ingredient model.Ingredient) (*model.Ingredient, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Ingredient, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Ingredient, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
 			*query = fmt.Sprintf("%s SET i.name = $name, i.lastModified = $lastModified\n"+
 				"RETURN i",
 				MatchNodeById("i", []string{IngredientLabel}))
-			*params = map[string]any{
+			params = map[string]any{
 				"iId":          ingredient.Id,
 				"name":         ingredient.Name,
 				"lastModified": neo4j.LocalDateTime(*ingredient.LastModified),
 			}
 
-			record, err := RunAndReturnSingleRecord(ctx, tx, *query, *params)
+			record, err := RunAndReturnSingleRecord(ctx, tx, *query, params)
 			if err != nil {
 				return nil, err
 			}
@@ -156,18 +156,18 @@ func (r *IngredientRepository) Update(ctx context.Context, ingredient model.Ingr
 }
 
 func (r *IngredientRepository) Delete(ctx context.Context, id string) (string, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (string, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (string, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
 			*query = fmt.Sprintf("%s MATCH (i)-[rel]-(:`%s`) WHERE rel.deleted IS NULL\n"+
 				"SET i.deleted = $deleted, rel.deleted = $deleted\n"+
 				"RETURN i.id AS id",
 				MatchNodeById("i", []string{IngredientLabel}), ResourceLabel)
-			*params = map[string]any{
+			params = map[string]any{
 				"iId":     id,
 				"deleted": neo4j.LocalDateTime(time.Now()),
 			}
 
-			record, err := RunAndReturnSingleRecord(ctx, tx, *query, *params)
+			record, err := RunAndReturnSingleRecord(ctx, tx, *query, params)
 			if err != nil {
 				return "", err
 			}

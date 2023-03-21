@@ -22,16 +22,16 @@ func NewRecipeRepository(driver neo4j.DriverWithContext) *RecipeRepository {
 }
 
 func (r *RecipeRepository) GetAll(ctx context.Context) ([]model.Recipe, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) ([]model.Recipe, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) ([]model.Recipe, error) {
 		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Recipe, error) {
 			*query = fmt.Sprintf("MATCH (r:`%s`) WHERE r.deleted IS NULL\n"+
 				"MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
 				"RETURN r AS recipe, collect(ci) AS rels",
 				RecipeLabel,
 				ContainsIngredientLabel, IngredientLabel)
-			*params = map[string]any{}
+			params = map[string]any{}
 
-			result, err := tx.Run(ctx, *query, *params)
+			result, err := tx.Run(ctx, *query, params)
 			if err != nil {
 				return nil, err
 			}
@@ -78,18 +78,18 @@ func (r *RecipeRepository) GetAll(ctx context.Context) ([]model.Recipe, error) {
 }
 
 func (r *RecipeRepository) GetById(ctx context.Context, id string) (*model.Recipe, bool, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Recipe, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Recipe, error) {
 		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 			*query = fmt.Sprintf("%s WHERE r.deleted IS NULL\n"+
 				"MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
 				"RETURN r AS recipe, collect(ci) AS rels",
 				MatchNodeById("r", []string{RecipeLabel}),
 				ContainsIngredientLabel, IngredientLabel)
-			*params = map[string]any{
+			params = map[string]any{
 				"rId": id,
 			}
 
-			record, err := RunAndReturnSingleRecord(ctx, tx, *query, *params)
+			record, err := RunAndReturnSingleRecord(ctx, tx, *query, params)
 			if err != nil {
 				return nil, err
 			}
@@ -130,7 +130,7 @@ func (r *RecipeRepository) GetById(ctx context.Context, id string) (*model.Recip
 }
 
 func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*model.Recipe, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Recipe, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Recipe, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 			relateIngredientStmts := []string{}
 			ingredientIdParams := map[string]any{}
@@ -156,17 +156,17 @@ func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*mo
 				RecipeLabel, ResourceLabel,
 				strings.Join(relateIngredientStmts, "\nWITH r "),
 				ContainsIngredientLabel, IngredientLabel)
-			*params = map[string]any{
+			params = map[string]any{
 				"title":       recipe.Title,
 				"description": recipe.Description,
 				"steps":       recipe.Steps,
 				"created":     neo4j.LocalDateTime(*recipe.Created),
 			}
 			for k, v := range ingredientIdParams {
-				(*params)[k] = v
+				params[k] = v
 			}
 
-			record, err := RunAndReturnSingleRecord(ctx, tx, *query, *params)
+			record, err := RunAndReturnSingleRecord(ctx, tx, *query, params)
 			if err != nil {
 				return nil, err
 			}
@@ -199,7 +199,7 @@ func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*mo
 }
 
 func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*model.Recipe, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (*model.Recipe, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Recipe, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
 			existingRecipe, found, err := r.GetById(ctx, recipe.Id)
 			if !found && err != nil {
@@ -274,7 +274,7 @@ func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*mo
 				MatchNodeById("r", []string{RecipeLabel}),
 				strings.Join(relStmts, "\nWITH r "),
 				ContainsIngredientLabel, IngredientLabel)
-			*params = map[string]any{
+			params = map[string]any{
 				"rId":          recipe.Id,
 				"description":  recipe.Description,
 				"title":        recipe.Title,
@@ -282,10 +282,10 @@ func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*mo
 				"lastModified": neo4j.LocalDateTime(*recipe.LastModified),
 			}
 			for k, v := range ingredientIdParams {
-				(*params)[k] = v
+				params[k] = v
 			}
 
-			record, err := RunAndReturnSingleRecord(ctx, tx, *query, *params)
+			record, err := RunAndReturnSingleRecord(ctx, tx, *query, params)
 			if err != nil {
 				return nil, err
 			}
@@ -319,19 +319,19 @@ func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*mo
 
 // TODO return *string?
 func (r *RecipeRepository) Delete(ctx context.Context, id string) (string, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params *map[string]any) (string, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (string, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
 			// TODO apply a Deleted label (and filter that :Resources are not also :Deleted)?
 			*query = fmt.Sprintf("%s MATCH (r)-[rel]-(:`%s`) WHERE rel.deleted IS NULL\n"+
 				"SET r.deleted = $deleted, rel.deleted = $deleted\n"+
 				"WITH r RETURN r.id AS id",
 				MatchNodeById("r", []string{RecipeLabel}), ResourceLabel)
-			*params = map[string]any{
+			params = map[string]any{
 				"rId":     id,
 				"deleted": neo4j.LocalDateTime(time.Now()),
 			}
 
-			record, err := RunAndReturnSingleRecord(ctx, tx, *query, *params)
+			record, err := RunAndReturnSingleRecord(ctx, tx, *query, params)
 			if err != nil {
 				return "", err
 			}

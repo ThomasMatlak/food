@@ -4,7 +4,6 @@ package util
 type Set[T comparable] map[T]bool
 
 // TODO documentation
-// TODO use pointers to Set?
 func Union[T comparable](s1 Set[T], s2 Set[T]) Set[T] {
 	union := Set[T]{}
 	for k := range s1 {
