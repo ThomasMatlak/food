@@ -218,8 +218,8 @@ func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*mo
 				existingIngredients[ci.TargetId] = ci
 			}
 
-			newIngredientIds := util.ArrayToSet(util.Map(recipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.TargetId }))
-			existingIngredientIds := util.ArrayToSet(util.Map(existingRecipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.TargetId }))
+			newIngredientIds := util.ArrayToSet(util.MapArray(recipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.TargetId }))
+			existingIngredientIds := util.ArrayToSet(util.MapArray(existingRecipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.TargetId }))
 
 			removedIngredientIds := util.Difference(existingIngredientIds, newIngredientIds)
 			addedIngredientIds := util.Difference(newIngredientIds, existingIngredientIds)
