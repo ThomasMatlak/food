@@ -5,9 +5,9 @@ import "testing"
 // TODO DRY
 // TODO test with different sized inputs
 func TestUnionOverlapping(t *testing.T) {
-	expectedUnion := Set[int]{1: true, 2: true, 3: true, 4: true}
-	s1 := Set[int]{1: true, 2: true, 3: true}
-	s2 := Set[int]{2: true, 3: true, 4: true}
+	expectedUnion := Set[int]{1: none{}, 2: none{}, 3: none{}, 4: none{}}
+	s1 := Set[int]{1: none{}, 2: none{}, 3: none{}}
+	s2 := Set[int]{2: none{}, 3: none{}, 4: none{}}
 
 	union := Union(s1, s2)
 	if len(union) < len(expectedUnion) {
@@ -17,7 +17,7 @@ func TestUnionOverlapping(t *testing.T) {
 		t.Fatalf("union is too big")
 	}
 	for k := range expectedUnion {
-		if !union[k] {
+		if _, ok := union[k]; !ok {
 			t.Fatalf("union does not match expected values")
 		}
 	}
@@ -30,16 +30,16 @@ func TestUnionOverlapping(t *testing.T) {
 		t.Fatalf("union is too big")
 	}
 	for k := range expectedUnion {
-		if !union[k] {
+		if _, ok := union[k]; !ok {
 			t.Fatalf("union does not match expected values")
 		}
 	}
 }
 
 func TestUnionSame(t *testing.T) {
-	expectedUnion := Set[int]{1: true, 2: true, 3: true}
-	s1 := Set[int]{1: true, 2: true, 3: true}
-	s2 := Set[int]{1: true, 2: true, 3: true}
+	expectedUnion := Set[int]{1: none{}, 2: none{}, 3: none{}}
+	s1 := Set[int]{1: none{}, 2: none{}, 3: none{}}
+	s2 := Set[int]{1: none{}, 2: none{}, 3: none{}}
 
 	union := Union(s1, s2)
 	if len(union) < len(expectedUnion) {
@@ -49,7 +49,7 @@ func TestUnionSame(t *testing.T) {
 		t.Fatalf("union is too big")
 	}
 	for k := range expectedUnion {
-		if !union[k] {
+		if _, ok := union[k]; !ok {
 			t.Fatalf("union does not match expected values")
 		}
 	}
@@ -62,16 +62,16 @@ func TestUnionSame(t *testing.T) {
 		t.Fatalf("union is too big")
 	}
 	for k := range expectedUnion {
-		if !union[k] {
+		if _, ok := union[k]; !ok {
 			t.Fatalf("union does not match expected values")
 		}
 	}
 }
 
 func TestUnionDisjoint(t *testing.T) {
-	expectedUnion := Set[int]{1: true, 2: true, 3: true, 4: true}
-	s1 := Set[int]{1: true, 2: true}
-	s2 := Set[int]{3: true, 4: true}
+	expectedUnion := Set[int]{1: none{}, 2: none{}, 3: none{}, 4: none{}}
+	s1 := Set[int]{1: none{}, 2: none{}}
+	s2 := Set[int]{3: none{}, 4: none{}}
 
 	union := Union(s1, s2)
 	if len(union) < len(expectedUnion) {
@@ -81,7 +81,7 @@ func TestUnionDisjoint(t *testing.T) {
 		t.Fatalf("union is too big")
 	}
 	for k := range expectedUnion {
-		if !union[k] {
+		if _, ok := union[k]; !ok {
 			t.Fatalf("union does not match expected values")
 		}
 	}
@@ -94,15 +94,15 @@ func TestUnionDisjoint(t *testing.T) {
 		t.Fatalf("union is too big")
 	}
 	for k := range expectedUnion {
-		if !union[k] {
+		if _, ok := union[k]; !ok {
 			t.Fatalf("union does not match expected values")
 		}
 	}
 }
 
-func TestUnionOneEmpty(t *testing.T) {
-	expectedUnion := Set[int]{1: true, 2: true}
-	s1 := Set[int]{1: true, 2: true}
+func TestUniononeEmpty(t *testing.T) {
+	expectedUnion := Set[int]{1: none{}, 2: none{}}
+	s1 := Set[int]{1: none{}, 2: none{}}
 	s2 := Set[int]{}
 
 	union := Union(s1, s2)
@@ -113,7 +113,7 @@ func TestUnionOneEmpty(t *testing.T) {
 		t.Fatalf("union is too big")
 	}
 	for k := range expectedUnion {
-		if !union[k] {
+		if _, ok := union[k]; !ok {
 			t.Fatalf("union does not match expected values")
 		}
 	}
@@ -126,7 +126,7 @@ func TestUnionOneEmpty(t *testing.T) {
 		t.Fatalf("union is too big")
 	}
 	for k := range expectedUnion {
-		if !union[k] {
+		if _, ok := union[k]; !ok {
 			t.Fatalf("union does not match expected values")
 		}
 	}
@@ -143,9 +143,9 @@ func TestUnionBothEmpty(t *testing.T) {
 }
 
 func TestIntersectionOverlapping(t *testing.T) {
-	expectedIntersection := Set[int]{2: true, 3: true}
-	s1 := Set[int]{1: true, 2: true, 3: true}
-	s2 := Set[int]{2: true, 3: true, 4: true}
+	expectedIntersection := Set[int]{2: none{}, 3: none{}}
+	s1 := Set[int]{1: none{}, 2: none{}, 3: none{}}
+	s2 := Set[int]{2: none{}, 3: none{}, 4: none{}}
 
 	intersection := Intersection(s1, s2)
 	if len(intersection) < len(expectedIntersection) {
@@ -155,7 +155,7 @@ func TestIntersectionOverlapping(t *testing.T) {
 		t.Fatalf("intersection is too big")
 	}
 	for k := range expectedIntersection {
-		if !intersection[k] {
+		if _, ok := intersection[k]; !ok {
 			t.Fatalf("intersection does not match expected values")
 		}
 	}
@@ -168,16 +168,16 @@ func TestIntersectionOverlapping(t *testing.T) {
 		t.Fatalf("intersection is too big")
 	}
 	for k := range expectedIntersection {
-		if !intersection[k] {
+		if _, ok := intersection[k]; !ok {
 			t.Fatalf("intersection does not match expected values")
 		}
 	}
 }
 
 func TestIntersectionSame(t *testing.T) {
-	expectedIntersection := Set[int]{1: true, 2: true, 3: true}
-	s1 := Set[int]{1: true, 2: true, 3: true}
-	s2 := Set[int]{1: true, 2: true, 3: true}
+	expectedIntersection := Set[int]{1: none{}, 2: none{}, 3: none{}}
+	s1 := Set[int]{1: none{}, 2: none{}, 3: none{}}
+	s2 := Set[int]{1: none{}, 2: none{}, 3: none{}}
 
 	intersection := Intersection(s1, s2)
 	if len(intersection) < len(expectedIntersection) {
@@ -187,7 +187,7 @@ func TestIntersectionSame(t *testing.T) {
 		t.Fatalf("intersection is too big")
 	}
 	for k := range expectedIntersection {
-		if !intersection[k] {
+		if _, ok := intersection[k]; !ok {
 			t.Fatalf("intersection does not match expected values")
 		}
 	}
@@ -200,15 +200,15 @@ func TestIntersectionSame(t *testing.T) {
 		t.Fatalf("intersection is too big")
 	}
 	for k := range expectedIntersection {
-		if !intersection[k] {
+		if _, ok := intersection[k]; !ok {
 			t.Fatalf("intersection does not match expected values")
 		}
 	}
 }
 
 func TestIntersectionDisjoint(t *testing.T) {
-	s1 := Set[int]{1: true, 2: true}
-	s2 := Set[int]{3: true, 4: true}
+	s1 := Set[int]{1: none{}, 2: none{}}
+	s2 := Set[int]{3: none{}, 4: none{}}
 
 	intersection := Intersection(s1, s2)
 	if len(intersection) != 0 {
@@ -221,8 +221,8 @@ func TestIntersectionDisjoint(t *testing.T) {
 	}
 }
 
-func TestIntersectionOneEmpty(t *testing.T) {
-	s1 := Set[int]{1: true, 2: true}
+func TestIntersectiononeEmpty(t *testing.T) {
+	s1 := Set[int]{1: none{}, 2: none{}}
 	s2 := Set[int]{}
 	intersection := Intersection(s1, s2)
 	if len(intersection) != 0 {
@@ -246,11 +246,11 @@ func TestIntersectionBothEmpty(t *testing.T) {
 }
 
 func TestDifferenceOverlapping(t *testing.T) {
-	s1 := Set[int]{1: true, 2: true, 3: true}
-	s2 := Set[int]{2: true, 3: true, 4: true}
+	s1 := Set[int]{1: none{}, 2: none{}, 3: none{}}
+	s2 := Set[int]{2: none{}, 3: none{}, 4: none{}}
 
 	difference := Difference(s1, s2)
-	expectedDifference := Set[int]{1: true}
+	expectedDifference := Set[int]{1: none{}}
 	if len(difference) < len(expectedDifference) {
 		t.Fatalf("difference is too small")
 	}
@@ -258,13 +258,13 @@ func TestDifferenceOverlapping(t *testing.T) {
 		t.Fatalf("difference is too big")
 	}
 	for k := range expectedDifference {
-		if !difference[k] {
+		if _, ok := difference[k]; !ok {
 			t.Fatalf("difference does not match expected values")
 		}
 	}
 
 	difference = Difference(s2, s1)
-	expectedDifference = Set[int]{4: true}
+	expectedDifference = Set[int]{4: none{}}
 	if len(difference) < len(expectedDifference) {
 		t.Fatalf("difference is too small")
 	}
@@ -272,15 +272,15 @@ func TestDifferenceOverlapping(t *testing.T) {
 		t.Fatalf("difference is too big")
 	}
 	for k := range expectedDifference {
-		if !difference[k] {
+		if _, ok := difference[k]; !ok {
 			t.Fatalf("difference does not match expected values")
 		}
 	}
 }
 
 func TestDifferenceSame(t *testing.T) {
-	s1 := Set[int]{1: true, 2: true}
-	s2 := Set[int]{1: true, 2: true}
+	s1 := Set[int]{1: none{}, 2: none{}}
+	s2 := Set[int]{1: none{}, 2: none{}}
 
 	difference := Difference(s1, s2)
 	if len(difference) != 0 {
@@ -289,11 +289,11 @@ func TestDifferenceSame(t *testing.T) {
 }
 
 func TestDifferenceDisjoint(t *testing.T) {
-	s1 := Set[int]{1: true, 2: true}
-	s2 := Set[int]{3: true, 4: true}
+	s1 := Set[int]{1: none{}, 2: none{}}
+	s2 := Set[int]{3: none{}, 4: none{}}
 
 	difference := Difference(s1, s2)
-	expectedDifference := Set[int]{1: true, 2: true}
+	expectedDifference := Set[int]{1: none{}, 2: none{}}
 	if len(difference) < len(expectedDifference) {
 		t.Fatalf("difference is too small")
 	}
@@ -301,13 +301,13 @@ func TestDifferenceDisjoint(t *testing.T) {
 		t.Fatalf("difference is too big")
 	}
 	for k := range expectedDifference {
-		if !difference[k] {
+		if _, ok := difference[k]; !ok {
 			t.Fatalf("difference does not match expected values")
 		}
 	}
 
 	difference = Difference(s2, s1)
-	expectedDifference = Set[int]{3: true, 4: true}
+	expectedDifference = Set[int]{3: none{}, 4: none{}}
 	if len(difference) < len(expectedDifference) {
 		t.Fatalf("difference is too small")
 	}
@@ -315,18 +315,18 @@ func TestDifferenceDisjoint(t *testing.T) {
 		t.Fatalf("difference is too big")
 	}
 	for k := range expectedDifference {
-		if !difference[k] {
+		if _, ok := difference[k]; !ok {
 			t.Fatalf("difference does not match expected values")
 		}
 	}
 }
 
 func TestDifferenceOneEmpty(t *testing.T) {
-	s1 := Set[int]{1: true, 2: true, 3: true}
+	s1 := Set[int]{1: none{}, 2: none{}, 3: none{}}
 	s2 := Set[int]{}
 
 	difference := Difference(s1, s2)
-	expectedDifference := Set[int]{1: true, 2: true, 3: true}
+	expectedDifference := Set[int]{1: none{}, 2: none{}, 3: none{}}
 	if len(difference) < len(expectedDifference) {
 		t.Fatalf("difference is too small")
 	}
@@ -334,7 +334,7 @@ func TestDifferenceOneEmpty(t *testing.T) {
 		t.Fatalf("difference is too big")
 	}
 	for k := range expectedDifference {
-		if !difference[k] {
+		if _, ok := difference[k]; !ok {
 			t.Fatalf("difference does not match expected values")
 		}
 	}
@@ -348,7 +348,7 @@ func TestDifferenceOneEmpty(t *testing.T) {
 		t.Fatalf("difference is too big")
 	}
 	for k := range expectedDifference {
-		if !difference[k] {
+		if _, ok := difference[k]; !ok {
 			t.Fatalf("difference does not match expected values")
 		}
 	}

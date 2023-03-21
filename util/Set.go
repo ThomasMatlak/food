@@ -1,16 +1,17 @@
 package util
 
-// TODO use map[T]struct{} for less memory
-type Set[T comparable] map[T]bool
+type none struct{}
+
+type Set[T comparable] map[T]none
 
 // TODO documentation
 func Union[T comparable](s1 Set[T], s2 Set[T]) Set[T] {
 	union := Set[T]{}
 	for k := range s1 {
-		union[k] = true
+		union[k] = none{}
 	}
 	for k := range s2 {
-		union[k] = true
+		union[k] = none{}
 	}
 	return union
 }
@@ -21,8 +22,8 @@ func Intersection[T comparable](s1 Set[T], s2 Set[T]) Set[T] {
 		s1, s2 = s2, s1
 	}
 	for k := range s1 {
-		if s2[k] {
-			intersection[k] = true
+		if _, ok := s2[k]; ok {
+			intersection[k] = none{}
 		}
 	}
 	return intersection
@@ -31,8 +32,8 @@ func Intersection[T comparable](s1 Set[T], s2 Set[T]) Set[T] {
 func Difference[T comparable](s1 Set[T], s2 Set[T]) Set[T] {
 	difference := Set[T]{}
 	for k := range s1 {
-		if !s2[k] {
-			difference[k] = true
+		if _, ok := s2[k]; !ok {
+			difference[k] = none{}
 		}
 	}
 	return difference
@@ -51,7 +52,7 @@ func Complement[T comparable](universe Set[T], s Set[T]) Set[T] {
 func ArrayToSet[T comparable](ts []T) Set[T] {
 	res := Set[T]{}
 	for i := range ts {
-		res[ts[i]] = true
+		res[ts[i]] = none{}
 	}
 	return res
 }
