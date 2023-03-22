@@ -74,7 +74,7 @@ func (r *RecipeRepository) GetAll(ctx context.Context) ([]model.Recipe, error) {
 		})
 	}
 
-	return RunQuery(ctx, r.driver, "get all recipes", work)
+	return RunQuery(ctx, r.driver, "get all recipes", neo4j.AccessModeRead, work)
 }
 
 func (r *RecipeRepository) GetById(ctx context.Context, id string) (*model.Recipe, bool, error) {
@@ -118,7 +118,7 @@ func (r *RecipeRepository) GetById(ctx context.Context, id string) (*model.Recip
 		})
 	}
 
-	recipe, err := RunQuery(ctx, r.driver, "get recipe", work)
+	recipe, err := RunQuery(ctx, r.driver, "get recipe", neo4j.AccessModeRead, work)
 
 	if err != nil && err.Error() == "Result contains no more records" {
 		return nil, false, nil
@@ -195,7 +195,7 @@ func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*mo
 		})
 	}
 
-	return RunQuery(ctx, r.driver, "create recipe", work)
+	return RunQuery(ctx, r.driver, "create recipe", neo4j.AccessModeWrite, work)
 }
 
 func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*model.Recipe, error) {
@@ -314,7 +314,7 @@ func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*mo
 		})
 	}
 
-	return RunQuery(ctx, r.driver, "update recipe", work)
+	return RunQuery(ctx, r.driver, "update recipe", neo4j.AccessModeWrite, work)
 }
 
 // TODO return *string?
@@ -345,7 +345,7 @@ func (r *RecipeRepository) Delete(ctx context.Context, id string) (string, error
 		})
 	}
 
-	return RunQuery(ctx, r.driver, "delete recipe", work)
+	return RunQuery(ctx, r.driver, "delete recipe", neo4j.AccessModeWrite, work)
 }
 
 func ParseRecipeNode(node dbtype.Node) (*model.Recipe, error) {

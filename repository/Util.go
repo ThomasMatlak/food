@@ -17,9 +17,10 @@ func RunQuery[T any](
 	ctx context.Context,
 	driver neo4j.DriverWithContext, // TODO *neo4j.DriverWithContext?
 	action string,
+	accessMode neo4j.AccessMode,
 	work func(context.Context, neo4j.SessionWithContext, *string, map[string]any) (T, error),
 ) (T, error) {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: accessMode})
 	defer session.Close(ctx)
 
 	var query string

@@ -58,7 +58,7 @@ func (r *IngredientRepository) GetAll(ctx context.Context) ([]model.Ingredient, 
 		})
 	}
 
-	return RunQuery(ctx, r.driver, "get all ingredients", work)
+	return RunQuery(ctx, r.driver, "get all ingredients", neo4j.AccessModeRead, work)
 }
 
 func (r *IngredientRepository) GetById(ctx context.Context, id string) (*model.Ingredient, bool, error) {
@@ -85,7 +85,7 @@ func (r *IngredientRepository) GetById(ctx context.Context, id string) (*model.I
 		})
 	}
 
-	ingredient, err := RunQuery(ctx, r.driver, "get ingredient", work)
+	ingredient, err := RunQuery(ctx, r.driver, "get ingredient", neo4j.AccessModeRead, work)
 
 	if err != nil && err.Error() == "Result contains no more records" {
 		return nil, false, nil
@@ -123,7 +123,7 @@ func (r *IngredientRepository) Create(ctx context.Context, ingredient model.Ingr
 		})
 	}
 
-	return RunQuery(ctx, r.driver, "create ingredient", work)
+	return RunQuery(ctx, r.driver, "create ingredient", neo4j.AccessModeWrite, work)
 }
 
 func (r *IngredientRepository) Update(ctx context.Context, ingredient model.Ingredient) (*model.Ingredient, error) {
@@ -152,7 +152,7 @@ func (r *IngredientRepository) Update(ctx context.Context, ingredient model.Ingr
 		})
 	}
 
-	return RunQuery(ctx, r.driver, "update ingredient", work)
+	return RunQuery(ctx, r.driver, "update ingredient", neo4j.AccessModeWrite, work)
 }
 
 func (r *IngredientRepository) Delete(ctx context.Context, id string) (string, error) {
@@ -181,7 +181,7 @@ func (r *IngredientRepository) Delete(ctx context.Context, id string) (string, e
 		})
 	}
 
-	return RunQuery(ctx, r.driver, "delete ingredient", work)
+	return RunQuery(ctx, r.driver, "delete ingredient", neo4j.AccessModeWrite, work)
 }
 
 func ParseIngredientNode(node dbtype.Node) (*model.Ingredient, error) {
