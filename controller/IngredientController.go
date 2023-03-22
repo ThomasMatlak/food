@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/ThomasMatlak/food/controller/request"
 	"github.com/ThomasMatlak/food/controller/response"
@@ -73,9 +72,6 @@ func (ic *IngredientController) createIngredient(w http.ResponseWriter, r *http.
 		var newIngredient model.Ingredient
 		newIngredient.Name = strings.TrimSpace(createIngredientRequest.Name)
 
-		newIngredient.Created = new(time.Time)
-		*newIngredient.Created = time.Now()
-
 		ingredient, err := ic.ingredientRepository.Create(ctx, newIngredient)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
@@ -104,9 +100,6 @@ func (ic *IngredientController) replaceIngredient(w http.ResponseWriter, r *http
 		json.NewDecoder(r.Body).Decode(&replaceIngredientRequest)
 
 		ingredient.Name = strings.TrimSpace(replaceIngredientRequest.Name)
-
-		ingredient.LastModified = new(time.Time)
-		*ingredient.LastModified = time.Now()
 
 		updatedIngredient, err := ic.ingredientRepository.Update(ctx, *ingredient)
 		if err != nil {
@@ -138,9 +131,6 @@ func (ic *IngredientController) updateIngredient(w http.ResponseWriter, r *http.
 		if replaceIngredientRequest.Name != nil {
 			ingredient.Name = strings.TrimSpace(*replaceIngredientRequest.Name)
 		}
-
-		ingredient.LastModified = new(time.Time)
-		*ingredient.LastModified = time.Now()
 
 		updatedIngredient, err := ic.ingredientRepository.Update(ctx, *ingredient)
 		if err != nil {

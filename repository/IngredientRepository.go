@@ -12,7 +12,7 @@ import (
 )
 
 type IngredientRepository struct {
-	driver neo4j.DriverWithContext
+	driver neo4j.DriverWithContext // TODO *neo4j.DriverWithContext?
 }
 
 func NewIngredientRepository(driver neo4j.DriverWithContext) *IngredientRepository {
@@ -106,7 +106,7 @@ func (r *IngredientRepository) Create(ctx context.Context, ingredient model.Ingr
 				IngredientLabel, ResourceLabel)
 			params = map[string]any{
 				"name":    ingredient.Name,
-				"created": neo4j.LocalDateTime(*ingredient.Created),
+				"created": neo4j.LocalDateTime(time.Now()),
 			}
 
 			record, err := RunAndReturnSingleRecord(ctx, tx, *query, params)
@@ -135,7 +135,7 @@ func (r *IngredientRepository) Update(ctx context.Context, ingredient model.Ingr
 			params = map[string]any{
 				"iId":          ingredient.Id,
 				"name":         ingredient.Name,
-				"lastModified": neo4j.LocalDateTime(*ingredient.LastModified),
+				"lastModified": neo4j.LocalDateTime(time.Now()),
 			}
 
 			record, err := RunAndReturnSingleRecord(ctx, tx, *query, params)
