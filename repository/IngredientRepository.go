@@ -101,7 +101,7 @@ func (r *IngredientRepository) Create(ctx context.Context, ingredient model.Ingr
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Ingredient, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
 			// TODO different id function?
-			*query = fmt.Sprintf("CREATE (i:`%s`:`%s`) SET i.id = toString(id(i)), i.name = $name, i.created = $created\n"+
+			*query = fmt.Sprintf("CREATE (i:`%s`:`%s`) SET i = {id: toString(id(i)), name: $name, created: $created}\n"+
 				"RETURN i",
 				IngredientLabel, ResourceLabel)
 			params = map[string]any{

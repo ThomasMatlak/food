@@ -34,16 +34,14 @@ func TestIngredientCreate(t *testing.T) {
 
 	ingredient := model.Ingredient{Name: "test ingredient"}
 	createdIngredient, err := repo.Create(ctx, ingredient)
-	if err != nil {
-		t.Error(err)
-	}
 
 	// TODO make a direct Cypher query to verify anything about the state of the graph?
 
 	assert := assert.New(t)
+	assert.NoError(err)
 	assert.NotEmpty(createdIngredient.Id)
 	assert.Equal(createdIngredient.Name, ingredient.Name)
-	assert.NotNil(createdIngredient.Created)
+	assert.NotNil(createdIngredient.Created) // TODO more rigorous assertion of Created (e.g. same year, month, day. Or maybe with x time of now)?
 	assert.Nil(createdIngredient.LastModified)
 	assert.Nil(createdIngredient.Deleted)
 }
