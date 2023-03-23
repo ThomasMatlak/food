@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/ThomasMatlak/food/model"
 	"github.com/ThomasMatlak/food/repository"
+	"github.com/ThomasMatlak/food/util"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
@@ -14,6 +16,138 @@ import (
 )
 
 // TODO use subtests https://go.dev/blog/subtests if possible to avoid needing to spin up a ton of containers
+
+func TestIngredientGetOne(t *testing.T) {
+	ctx := context.Background()
+
+	neo4jContainer, err := startNeo4j(ctx, t)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	neo4jDriver, err := neo4jDriver(ctx, t, neo4jContainer)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// seed data
+	id := "123"
+
+	query := "CREATE (:Ingredient {id: $id, name: $name, created: $created})"
+	createdTime := time.Now()
+	params := map[string]any{
+		"id":      id,
+		"name":    "test ingredient",
+		"created": neo4j.LocalDateTime(createdTime),
+	}
+
+	_, err = neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
+			return tx.Run(ctx, query, params)
+		})
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// test
+	repo := repository.NewIngredientRepository(*neo4jDriver)
+	ingredient, found, err := repo.GetById(ctx, id)
+
+	assert := assert.New(t)
+	assert.NoError(err)
+	assert.True(found)
+	assert.Equal(id, ingredient.Id)
+	assert.Equal("test ingredient", ingredient.Name)
+	assert.WithinDuration(createdTime, *ingredient.Created, 0)
+	assert.Nil(ingredient.LastModified)
+	assert.Nil(ingredient.Deleted)
+}
+
+func TestIngredientGetOneDoesNotExist(t *testing.T) {
+	ctx := context.Background()
+
+	neo4jContainer, err := startNeo4j(ctx, t)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	neo4jDriver, err := neo4jDriver(ctx, t, neo4jContainer)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// no seed data
+
+	// test
+	repo := repository.NewIngredientRepository(*neo4jDriver)
+	ingredient, found, err := repo.GetById(ctx, "test id")
+
+	// TODO make a direct Cypher query to verify anything about the state of the graph?
+
+	assert := assert.New(t)
+	assert.NoError(err)
+	assert.False(found)
+	assert.Nil(ingredient)
+}
+
+func TestIngredientGetAll(t *testing.T) {
+	ctx := context.Background()
+
+	neo4jContainer, err := startNeo4j(ctx, t)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	neo4jDriver, err := neo4jDriver(ctx, t, neo4jContainer)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// seed data
+	seedIngredients := []model.Ingredient{
+		{Id: "123", Name: "test ingredient 1"},
+		{Id: "456", Name: "test ingredient 2"},
+	}
+
+	input := util.MapArray(seedIngredients, func(i model.Ingredient) map[string]string {
+		return map[string]string{"id": i.Id, "name": i.Name}
+	})
+
+	query := "UNWIND $input AS i CREATE (:Ingredient {id: i.id, name: i.name, created: $created})"
+	createdTime := time.Now()
+	params := map[string]any{
+		"input":   input,
+		"created": neo4j.LocalDateTime(createdTime),
+	}
+
+	_, err = neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
+			return tx.Run(ctx, query, params)
+		})
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// test
+	repo := repository.NewIngredientRepository(*neo4jDriver)
+	ingredients, err := repo.GetAll(ctx)
+
+	assert := assert.New(t)
+	assert.NoError(err)
+	// comparing time stamps is tricky
+	ingredientsWithoutCreated := util.MapArray(ingredients, func(i model.Ingredient) model.Ingredient {
+		return model.Ingredient{Id: i.Id, Name: i.Name}
+	})
+	assert.ElementsMatch(seedIngredients, ingredientsWithoutCreated)
+}
 
 func TestIngredientCreate(t *testing.T) {
 	ctx := context.Background()
@@ -32,7 +166,8 @@ func TestIngredientCreate(t *testing.T) {
 
 	repo := repository.NewIngredientRepository(*neo4jDriver)
 
-	ingredient := model.Ingredient{Name: "test ingredient"}
+	name := "test ingredient"
+	ingredient := model.Ingredient{Name: name}
 	createdIngredient, err := repo.Create(ctx, ingredient)
 
 	// TODO make a direct Cypher query to verify anything about the state of the graph?
@@ -40,10 +175,154 @@ func TestIngredientCreate(t *testing.T) {
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.NotEmpty(createdIngredient.Id)
-	assert.Equal(createdIngredient.Name, ingredient.Name)
-	assert.NotNil(createdIngredient.Created) // TODO more rigorous assertion of Created (e.g. same year, month, day. Or maybe with x time of now)?
+	assert.Equal(name, createdIngredient.Name)
+	assert.WithinDuration(time.Now(), *createdIngredient.Created, time.Duration(1_000_000_000))
 	assert.Nil(createdIngredient.LastModified)
 	assert.Nil(createdIngredient.Deleted)
+}
+
+func TestIngredientUpdate(t *testing.T) {
+	ctx := context.Background()
+
+	neo4jContainer, err := startNeo4j(ctx, t)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	neo4jDriver, err := neo4jDriver(ctx, t, neo4jContainer)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// seed data
+	id := "123"
+
+	query := "CREATE (:Ingredient {id: $id, name: $name, created: $created})"
+	createdTime := time.Now()
+	params := map[string]any{
+		"id":      id,
+		"name":    "test ingredient",
+		"created": neo4j.LocalDateTime(createdTime),
+	}
+
+	_, err = neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
+			return tx.Run(ctx, query, params)
+		})
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// test
+	repo := repository.NewIngredientRepository(*neo4jDriver)
+
+	ingredient := model.Ingredient{Id: id, Name: "test ingredient updated"}
+	updatedIngredient, err := repo.Update(ctx, ingredient)
+
+	// TODO make a direct Cypher query to verify anything about the state of the graph?
+
+	assert := assert.New(t)
+	assert.NoError(err)
+	assert.Equal(id, updatedIngredient.Id)
+	assert.Equal("test ingredient updated", updatedIngredient.Name)
+	assert.WithinDuration(createdTime, *updatedIngredient.Created, 0)
+	assert.True((*updatedIngredient.LastModified).After(createdTime))
+	assert.Nil(updatedIngredient.Deleted)
+}
+
+func TestIngredientDeleteNoConnections(t *testing.T) {
+	ctx := context.Background()
+
+	neo4jContainer, err := startNeo4j(ctx, t)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	neo4jDriver, err := neo4jDriver(ctx, t, neo4jContainer)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// seed data
+	id := "123"
+
+	query := "CREATE (:Ingredient {id: $id, name: $name, created: $created})"
+	createdTime := time.Now()
+	params := map[string]any{
+		"id":      id,
+		"name":    "test ingredient",
+		"created": neo4j.LocalDateTime(createdTime),
+	}
+
+	_, err = neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
+			return tx.Run(ctx, query, params)
+		})
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// test
+	repo := repository.NewIngredientRepository(*neo4jDriver)
+	deletedId, err := repo.Delete(ctx, id)
+
+	// TODO make a direct Cypher query to verify anything about the state of the graph?
+
+	assert := assert.New(t)
+	assert.NoError(err)
+	assert.Equal(id, deletedId)
+}
+
+func TestIngredientDeleteWithConnections(t *testing.T) {
+	ctx := context.Background()
+
+	neo4jContainer, err := startNeo4j(ctx, t)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	neo4jDriver, err := neo4jDriver(ctx, t, neo4jContainer)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// seed data
+	id := "123"
+
+	query := "CREATE (:Ingredient {id: $id, name: $name, created: $created})<-[:CONTAINS_INGREDIENT {created: $created}]-(:Recipe {created: $created})"
+	createdTime := time.Now()
+	params := map[string]any{
+		"id":      id,
+		"name":    "test ingredient",
+		"created": neo4j.LocalDateTime(createdTime),
+	}
+
+	_, err = neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
+			return tx.Run(ctx, query, params)
+		})
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// test
+	repo := repository.NewIngredientRepository(*neo4jDriver)
+	deletedId, err := repo.Delete(ctx, id)
+
+	// TODO make a direct Cypher query to verify anything about the state of the graph?
+
+	assert := assert.New(t)
+	assert.NoError(err)
+	assert.Equal(id, deletedId)
 }
 
 func neo4jDriver(ctx context.Context, t *testing.T, container *testcontainers.Container) (*neo4j.DriverWithContext, error) {
