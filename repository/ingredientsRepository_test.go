@@ -15,9 +15,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-// TODO use subtests https://go.dev/blog/subtests if possible to avoid needing to spin up a ton of containers
-
-func TestIngredientGetOne(t *testing.T) {
+func TestIngredientRepository(t *testing.T) {
 	ctx := context.Background()
 
 	neo4jContainer, err := startNeo4j(ctx, t)
@@ -32,6 +30,38 @@ func TestIngredientGetOne(t *testing.T) {
 		t.FailNow()
 	}
 
+	t.Run("Get One", func(t *testing.T) {
+		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
+		testGetOne(ctx, neo4jDriver, t)
+	})
+	t.Run("Get One (does not exist)", func(t *testing.T) {
+		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
+		testGetOneDoesNotExist(ctx, neo4jDriver, t)
+	})
+	t.Run("Get All", func(t *testing.T) {
+		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
+		testGetAll(ctx, neo4jDriver, t)
+	})
+	t.Run("Create", func(t *testing.T) {
+		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
+		testCreate(ctx, neo4jDriver, t)
+	})
+	t.Run("Update", func(t *testing.T) {
+		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
+		testUpdate(ctx, neo4jDriver, t)
+	})
+	t.Run("Delete (no connections)", func(t *testing.T) {
+		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
+		testDeleteNoConnections(ctx, neo4jDriver, t)
+	})
+	t.Run("Delete (with connections)", func(t *testing.T) {
+		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
+		testDeleteWithConnections(ctx, neo4jDriver, t)
+	})
+}
+
+func testGetOne(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
+	// func testIngredientGetOne(t *testing.T) {
 	// seed data
 	id := "123"
 
@@ -43,7 +73,7 @@ func TestIngredientGetOne(t *testing.T) {
 		"created": neo4j.LocalDateTime(createdTime),
 	}
 
-	_, err = neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+	_, err := neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
 		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
 			return tx.Run(ctx, query, params)
 		})
@@ -66,21 +96,7 @@ func TestIngredientGetOne(t *testing.T) {
 	assert.Nil(ingredient.Deleted)
 }
 
-func TestIngredientGetOneDoesNotExist(t *testing.T) {
-	ctx := context.Background()
-
-	neo4jContainer, err := startNeo4j(ctx, t)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	neo4jDriver, err := neo4jDriver(ctx, t, neo4jContainer)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
+func testGetOneDoesNotExist(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
 	// no seed data
 
 	// test
@@ -95,21 +111,7 @@ func TestIngredientGetOneDoesNotExist(t *testing.T) {
 	assert.Nil(ingredient)
 }
 
-func TestIngredientGetAll(t *testing.T) {
-	ctx := context.Background()
-
-	neo4jContainer, err := startNeo4j(ctx, t)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	neo4jDriver, err := neo4jDriver(ctx, t, neo4jContainer)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
+func testGetAll(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
 	// seed data
 	seedIngredients := []model.Ingredient{
 		{Id: "123", Name: "test ingredient 1"},
@@ -127,7 +129,7 @@ func TestIngredientGetAll(t *testing.T) {
 		"created": neo4j.LocalDateTime(createdTime),
 	}
 
-	_, err = neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+	_, err := neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
 		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
 			return tx.Run(ctx, query, params)
 		})
@@ -149,21 +151,7 @@ func TestIngredientGetAll(t *testing.T) {
 	assert.ElementsMatch(seedIngredients, ingredientsWithoutCreated)
 }
 
-func TestIngredientCreate(t *testing.T) {
-	ctx := context.Background()
-
-	neo4jContainer, err := startNeo4j(ctx, t)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	neo4jDriver, err := neo4jDriver(ctx, t, neo4jContainer)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
+func testCreate(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
 	repo := repository.NewIngredientRepository(*neo4jDriver)
 
 	name := "test ingredient"
@@ -181,21 +169,7 @@ func TestIngredientCreate(t *testing.T) {
 	assert.Nil(createdIngredient.Deleted)
 }
 
-func TestIngredientUpdate(t *testing.T) {
-	ctx := context.Background()
-
-	neo4jContainer, err := startNeo4j(ctx, t)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	neo4jDriver, err := neo4jDriver(ctx, t, neo4jContainer)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
+func testUpdate(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
 	// seed data
 	id := "123"
 
@@ -207,7 +181,7 @@ func TestIngredientUpdate(t *testing.T) {
 		"created": neo4j.LocalDateTime(createdTime),
 	}
 
-	_, err = neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+	_, err := neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
 		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
 			return tx.Run(ctx, query, params)
 		})
@@ -233,21 +207,7 @@ func TestIngredientUpdate(t *testing.T) {
 	assert.Nil(updatedIngredient.Deleted)
 }
 
-func TestIngredientDeleteNoConnections(t *testing.T) {
-	ctx := context.Background()
-
-	neo4jContainer, err := startNeo4j(ctx, t)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	neo4jDriver, err := neo4jDriver(ctx, t, neo4jContainer)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
+func testDeleteNoConnections(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
 	// seed data
 	id := "123"
 
@@ -259,7 +219,7 @@ func TestIngredientDeleteNoConnections(t *testing.T) {
 		"created": neo4j.LocalDateTime(createdTime),
 	}
 
-	_, err = neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+	_, err := neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
 		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
 			return tx.Run(ctx, query, params)
 		})
@@ -279,21 +239,7 @@ func TestIngredientDeleteNoConnections(t *testing.T) {
 	assert.Equal(id, deletedId)
 }
 
-func TestIngredientDeleteWithConnections(t *testing.T) {
-	ctx := context.Background()
-
-	neo4jContainer, err := startNeo4j(ctx, t)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	neo4jDriver, err := neo4jDriver(ctx, t, neo4jContainer)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
+func testDeleteWithConnections(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
 	// seed data
 	id := "123"
 
@@ -305,7 +251,7 @@ func TestIngredientDeleteWithConnections(t *testing.T) {
 		"created": neo4j.LocalDateTime(createdTime),
 	}
 
-	_, err = neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+	_, err := neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
 		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
 			return tx.Run(ctx, query, params)
 		})
@@ -323,6 +269,13 @@ func TestIngredientDeleteWithConnections(t *testing.T) {
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.Equal(id, deletedId)
+}
+
+func clearNeo4j(ctx context.Context, driver *neo4j.DriverWithContext) (neo4j.ResultWithContext, error) {
+	return neo4j.ExecuteWrite(ctx, (*driver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
+			return tx.Run(ctx, "MATCH (n) DETACH DELETE n", nil)
+		})
 }
 
 func neo4jDriver(ctx context.Context, t *testing.T, container *testcontainers.Container) (*neo4j.DriverWithContext, error) {
