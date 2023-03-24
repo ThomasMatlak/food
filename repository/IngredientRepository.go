@@ -136,7 +136,7 @@ func (r *IngredientRepository) Create(ctx context.Context, ingredient model.Ingr
 func (r *IngredientRepository) Update(ctx context.Context, ingredient model.Ingredient) (*model.Ingredient, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Ingredient, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
-			*query = fmt.Sprintf("%s SET i.name = $name, i.lastModified = $lastModified\n"+
+			*query = fmt.Sprintf("%s SET i += {name: $name, lastModified: $lastModified}\n"+
 				"RETURN i",
 				MatchNodeById("i", []string{IngredientLabel}))
 			params = map[string]any{
