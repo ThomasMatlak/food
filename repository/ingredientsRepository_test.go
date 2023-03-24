@@ -42,6 +42,10 @@ func TestIngredientRepository(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
 		testGetAll(ctx, neo4jDriver, t)
 	})
+	t.Run("Get All (empty)", func(t *testing.T) {
+		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
+		testGetAllEmpty(ctx, neo4jDriver, t)
+	})
 	t.Run("Create", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
 		testCreate(ctx, neo4jDriver, t)
@@ -149,6 +153,22 @@ func testGetAll(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *te
 		return model.Ingredient{Id: i.Id, Name: i.Name}
 	})
 	assert.ElementsMatch(seedIngredients, ingredientsWithoutCreated)
+}
+
+func testGetAllEmpty(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
+	// no seed data
+
+	// test
+	repo := repository.NewIngredientRepository(*neo4jDriver)
+	ingredients, err := repo.GetAll(ctx)
+
+	assert := assert.New(t)
+	assert.NoError(err)
+	// comparing time stamps is tricky
+	ingredientsWithoutCreated := util.MapArray(ingredients, func(i model.Ingredient) model.Ingredient {
+		return model.Ingredient{Id: i.Id, Name: i.Name}
+	})
+	assert.ElementsMatch([]model.Ingredient{}, ingredientsWithoutCreated)
 }
 
 func testCreate(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
