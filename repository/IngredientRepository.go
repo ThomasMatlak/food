@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ThomasMatlak/food/model"
@@ -100,11 +101,17 @@ func (r *IngredientRepository) GetById(ctx context.Context, id string) (*model.I
 func (r *IngredientRepository) Create(ctx context.Context, ingredient model.Ingredient) (*model.Ingredient, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Ingredient, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
-			// TODO different id function?
-			*query = fmt.Sprintf("CREATE (i:`%s`:`%s`) SET i = {id: toString(id(i)), name: $name, created: $created}\n"+
+			labels := []string{IngredientLabel, ResourceLabel}
+			id, err := model.ResourceId(labels)
+			if err != nil {
+				return nil, err
+			}
+
+			*query = fmt.Sprintf("CREATE (i:`%s`) SET i = {id: $id, name: $name, created: $created}\n"+
 				"RETURN i",
-				IngredientLabel, ResourceLabel)
+				strings.Join(labels, "`:`"))
 			params = map[string]any{
+				"id":      id,
 				"name":    ingredient.Name,
 				"created": neo4j.LocalDateTime(time.Now()),
 			}

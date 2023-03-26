@@ -1,14 +1,14 @@
 package repository
 
 import (
-	"strings"
-
 	"github.com/ThomasMatlak/food/model"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 )
 
-func ParseContainsIngredientRelationship(rel dbtype.Relationship) (*model.ContainsIngredient, error) {
+func ParseContainsIngredientRelationship(ingredient *dbtype.Node, rel *dbtype.Relationship) (*model.ContainsIngredient, error) {
+	ingredientId, err := neo4j.GetProperty[string](ingredient, "id")
+
 	unit, err := neo4j.GetProperty[string](rel, "unit")
 	if err != nil {
 		return nil, err
@@ -24,14 +24,5 @@ func ParseContainsIngredientRelationship(rel dbtype.Relationship) (*model.Contai
 		return nil, err
 	}
 
-	relationship := ParseRelationship(rel)
-
-	return &model.ContainsIngredient{Unit: unit, Amount: amount, Relationship: *relationship, Resource: *resource}, nil
-}
-
-func ParseRelationship(rel dbtype.Relationship) *model.Relationship {
-	source := strings.Split(rel.StartElementId, ":")
-	target := strings.Split(rel.EndElementId, ":")
-
-	return &model.Relationship{SourceId: &source[len(source)-1], TargetId: target[len(target)-1]}
+	return &model.ContainsIngredient{Unit: unit, Amount: amount, IngredientId: ingredientId, Resource: *resource}, nil
 }

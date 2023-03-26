@@ -15,3 +15,13 @@ func MapArray[T, V any](ts []T, fn func(T) V) []V {
 	}
 	return result
 }
+
+func FilterArray[T any](arr []T, fn func(T) bool) []T {
+	result := []T{}
+	for _, a := range arr {
+		if fn(a) {
+			result = append(result, a)
+		}
+	}
+	return result
+}
