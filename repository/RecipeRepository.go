@@ -138,7 +138,6 @@ func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*mo
 				nodeVar := fmt.Sprintf("i%d", i)
 				unitVar := fmt.Sprintf("i%dUnit", i)
 				amountVar := fmt.Sprintf("i%dAmount", i)
-				// TODO fail if ingredient does not exist or has been deleted
 				statement := fmt.Sprintf("%s CREATE (r)-[:`%s` {unit: $%s, amount: $%s, created: $created}]->(%s)",
 					MatchNodeById(nodeVar, []string{IngredientLabel}), ContainsIngredientLabel, unitVar, amountVar, nodeVar)
 

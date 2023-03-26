@@ -55,12 +55,12 @@ func TestRecipeRepository(t *testing.T) {
 		testCreateRecipeNoDescription(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Create (one ingredient not found)", func(t *testing.T) {
-		t.SkipNow()
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
+		testCreateRecipeOneIngredientNotFound(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Create (no ingredients found)", func(t *testing.T) {
-		t.SkipNow()
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
+		testCreateRecipeNoIngredientsFound(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Update (ingredient list unchanged)", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
@@ -83,13 +83,14 @@ func TestRecipeRepository(t *testing.T) {
 		testUpdateRecipeReaddIngredient(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Update (one ingredient not found)", func(t *testing.T) {
-		t.SkipNow()
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
+		testUpdateRecipeOneIngredientNotFound(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Update (no ingredients found)", func(t *testing.T) {
-		t.SkipNow()
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
+		testUpdateRecipeNoIngredientsFound(ctx, neo4jDriver, repo, t)
 	})
+	// TODO when it is a deleted ingredient that cannot be found, should there be an error?
 	t.Run("Delete", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
 		testDeleteRecipe(ctx, neo4jDriver, repo, t)
@@ -310,6 +311,65 @@ func testCreateRecipeNoDescription(ctx context.Context, neo4jDriver *neo4j.Drive
 	assert.WithinDuration(time.Now(), *createdRecipe.Created, time.Duration(1_000_000_000))
 	assert.Nil(createdRecipe.LastModified)
 	assert.Nil(createdRecipe.Deleted)
+}
+
+func testCreateRecipeOneIngredientNotFound(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.RecipeRepository, t *testing.T) {
+	// seed data
+	query := "UNWIND $ingredients AS i CREATE (:Ingredient {id: i.id, name: i.name, created: $created})"
+	ingredientParams := []map[string]string{
+		{"id": "asdf", "name": "rice"},
+	}
+	createdTime := time.Now()
+	params := map[string]any{
+		"ingredients": ingredientParams,
+		"created":     neo4j.LocalDateTime(createdTime),
+	}
+
+	_, err := neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
+			return tx.Run(ctx, query, params)
+		})
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// test
+	title := "test recipe"
+	description := "test description"
+	ingredients := []model.ContainsIngredient{
+		{Unit: "cup", Amount: 1, IngredientId: "asdf"},
+		{Unit: "cup", Amount: 1, IngredientId: "zxcv"},
+	}
+	steps := []string{"cook beans", "cook rice", "combine cooked beans and rice"}
+	recipe := model.Recipe{Title: title, Description: &description, Ingredients: ingredients, Steps: steps}
+	createdRecipe, err := repo.Create(ctx, recipe)
+
+	// TODO make a direct Cypher query to verify anything about the state of the graph?
+
+	assert := assert.New(t)
+	assert.Error(err)
+	assert.Nil(createdRecipe)
+}
+
+func testCreateRecipeNoIngredientsFound(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.RecipeRepository, t *testing.T) {
+	// no seed data since we don't want to match any ingredients
+	// test
+	title := "test recipe"
+	description := "test description"
+	ingredients := []model.ContainsIngredient{
+		{Unit: "cup", Amount: 1, IngredientId: "asdf"},
+		{Unit: "cup", Amount: 1, IngredientId: "zxcv"},
+	}
+	steps := []string{"cook beans", "cook rice", "combine cooked beans and rice"}
+	recipe := model.Recipe{Title: title, Description: &description, Ingredients: ingredients, Steps: steps}
+	createdRecipe, err := repo.Create(ctx, recipe)
+
+	// TODO make a direct Cypher query to verify anything about the state of the graph?
+
+	assert := assert.New(t)
+	assert.Error(err)
+	assert.Nil(createdRecipe)
 }
 
 func testUpdateRecipeNoIngredientsChanged(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.RecipeRepository, t *testing.T) {
@@ -577,6 +637,94 @@ func testUpdateRecipeReaddIngredient(ctx context.Context, neo4jDriver *neo4j.Dri
 	assert.WithinDuration(createdTime, *updatedRecipe.Created, 0)
 	assert.True((*updatedRecipe.LastModified).After(createdTime))
 	assert.Nil(updatedRecipe.Deleted)
+}
+
+func testUpdateRecipeOneIngredientNotFound(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.RecipeRepository, t *testing.T) {
+	// seed data
+	id := "1"
+
+	seedIngredients := []map[string]any{
+		{"id": "123", "name": "test ingredient 1"},
+	}
+
+	seedRecipes := []map[string]any{
+		{"id": id, "title": "test recipe", "description": "tastes alright", "steps": []string{"cook it"},
+			"ingredients": []map[string]any{{"unit": "g", "amount": 15, "ingredient_id": "123"}}},
+	}
+
+	createdTime := time.Now()
+	params := map[string]any{
+		"ingredients": seedIngredients,
+		"recipes":     seedRecipes,
+		"created":     neo4j.LocalDateTime(createdTime),
+	}
+
+	_, err := neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
+			return tx.Run(ctx, seedIngredientsAndRecipes, params)
+		})
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// test
+	desc := "tastes okay"
+	recipe := model.Recipe{Id: id, Title: "test recipe updated", Description: &desc, Steps: []string{"do prep work", "cook it"}, Ingredients: []model.ContainsIngredient{
+		{Unit: "g", Amount: 15, IngredientId: "123"},
+		{Unit: "cup", Amount: 1, IngredientId: "456"},
+	}}
+	updatedRecipe, err := repo.Update(ctx, recipe)
+
+	// TODO make a direct Cypher query to verify anything about the state of the graph?
+
+	assert := assert.New(t)
+	assert.Error(err)
+	assert.Nil(updatedRecipe)
+}
+
+func testUpdateRecipeNoIngredientsFound(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.RecipeRepository, t *testing.T) {
+	// seed data
+	id := "1"
+
+	seedIngredients := []map[string]any{
+		{"id": "123", "name": "test ingredient 1"},
+	}
+
+	seedRecipes := []map[string]any{
+		{"id": id, "title": "test recipe", "description": "tastes alright", "steps": []string{"cook it"},
+			"ingredients": []map[string]any{{"unit": "g", "amount": 15, "ingredient_id": "123"}}},
+	}
+
+	createdTime := time.Now()
+	params := map[string]any{
+		"ingredients": seedIngredients,
+		"recipes":     seedRecipes,
+		"created":     neo4j.LocalDateTime(createdTime),
+	}
+
+	_, err := neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
+		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
+			return tx.Run(ctx, seedIngredientsAndRecipes, params)
+		})
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	// test
+	desc := "tastes okay"
+	recipe := model.Recipe{Id: id, Title: "test recipe updated", Description: &desc, Steps: []string{"do prep work", "cook it"}, Ingredients: []model.ContainsIngredient{
+		{Unit: "cup", Amount: 1, IngredientId: "456"},
+		{Unit: "oz", Amount: 1, IngredientId: "789"},
+	}}
+	updatedRecipe, err := repo.Update(ctx, recipe)
+
+	// TODO make a direct Cypher query to verify anything about the state of the graph?
+
+	assert := assert.New(t)
+	assert.Error(err)
+	assert.Nil(updatedRecipe)
 }
 
 func testDeleteRecipe(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.RecipeRepository, t *testing.T) {
