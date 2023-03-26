@@ -166,7 +166,7 @@ func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*mo
 				"title":       recipe.Title,
 				"description": recipe.Description,
 				"steps":       recipe.Steps,
-				"created":     neo4j.LocalDateTime(*recipe.Created),
+				"created":     neo4j.LocalDateTime(time.Now()),
 			}
 			for k, v := range ingredientIdParams {
 				params[k] = v
@@ -285,7 +285,7 @@ func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*mo
 				"description":  recipe.Description,
 				"title":        recipe.Title,
 				"steps":        recipe.Steps,
-				"lastModified": neo4j.LocalDateTime(*recipe.LastModified),
+				"lastModified": neo4j.LocalDateTime(time.Now()),
 			}
 			for k, v := range ingredientIdParams {
 				params[k] = v

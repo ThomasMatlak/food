@@ -30,42 +30,43 @@ func TestIngredientRepository(t *testing.T) {
 		t.FailNow()
 	}
 
+	repo := repository.NewIngredientRepository(*neo4jDriver)
+
 	t.Run("Get One", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testGetOne(ctx, neo4jDriver, t)
+		testGetOneIngredient(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Get One (does not exist)", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testGetOneDoesNotExist(ctx, neo4jDriver, t)
+		testGetOneDoesNotExistIngredient(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Get All", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testGetAll(ctx, neo4jDriver, t)
+		testGetAllIngredient(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Get All (empty)", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testGetAllEmpty(ctx, neo4jDriver, t)
+		testGetAllEmptyIngredient(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Create", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testCreate(ctx, neo4jDriver, t)
+		testCreateIngredient(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Update", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testUpdate(ctx, neo4jDriver, t)
+		testUpdateIngredient(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Delete (no connections)", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testDeleteNoConnections(ctx, neo4jDriver, t)
+		testDeleteNoConnectionsIngredient(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Delete (with connections)", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testDeleteWithConnections(ctx, neo4jDriver, t)
+		testDeleteWithConnectionsIngredient(ctx, neo4jDriver, repo, t)
 	})
 }
 
-func testGetOne(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
-	// func testIngredientGetOne(t *testing.T) {
+func testGetOneIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
 	// seed data
 	id := "123"
 
@@ -87,7 +88,6 @@ func testGetOne(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *te
 	}
 
 	// test
-	repo := repository.NewIngredientRepository(*neo4jDriver)
 	ingredient, found, err := repo.GetById(ctx, id)
 
 	assert := assert.New(t)
@@ -100,14 +100,11 @@ func testGetOne(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *te
 	assert.Nil(ingredient.Deleted)
 }
 
-func testGetOneDoesNotExist(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
+func testGetOneDoesNotExistIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
 	// no seed data
 
 	// test
-	repo := repository.NewIngredientRepository(*neo4jDriver)
 	ingredient, found, err := repo.GetById(ctx, "test id")
-
-	// TODO make a direct Cypher query to verify anything about the state of the graph?
 
 	assert := assert.New(t)
 	assert.NoError(err)
@@ -115,7 +112,7 @@ func testGetOneDoesNotExist(ctx context.Context, neo4jDriver *neo4j.DriverWithCo
 	assert.Nil(ingredient)
 }
 
-func testGetAll(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
+func testGetAllIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
 	// seed data
 	seedIngredients := []model.Ingredient{
 		{Id: "123", Name: "test ingredient 1"},
@@ -143,7 +140,6 @@ func testGetAll(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *te
 	}
 
 	// test
-	repo := repository.NewIngredientRepository(*neo4jDriver)
 	ingredients, err := repo.GetAll(ctx)
 
 	assert := assert.New(t)
@@ -155,25 +151,18 @@ func testGetAll(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *te
 	assert.ElementsMatch(seedIngredients, ingredientsWithoutCreated)
 }
 
-func testGetAllEmpty(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
+func testGetAllEmptyIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
 	// no seed data
 
 	// test
-	repo := repository.NewIngredientRepository(*neo4jDriver)
 	ingredients, err := repo.GetAll(ctx)
 
 	assert := assert.New(t)
 	assert.NoError(err)
-	// comparing time stamps is tricky
-	ingredientsWithoutCreated := util.MapArray(ingredients, func(i model.Ingredient) model.Ingredient {
-		return model.Ingredient{Id: i.Id, Name: i.Name}
-	})
-	assert.ElementsMatch([]model.Ingredient{}, ingredientsWithoutCreated)
+	assert.Empty(ingredients)
 }
 
-func testCreate(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
-	repo := repository.NewIngredientRepository(*neo4jDriver)
-
+func testCreateIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
 	name := "test ingredient"
 	ingredient := model.Ingredient{Name: name}
 	createdIngredient, err := repo.Create(ctx, ingredient)
@@ -189,7 +178,7 @@ func testCreate(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *te
 	assert.Nil(createdIngredient.Deleted)
 }
 
-func testUpdate(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
+func testUpdateIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
 	// seed data
 	id := "123"
 
@@ -211,8 +200,6 @@ func testUpdate(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *te
 	}
 
 	// test
-	repo := repository.NewIngredientRepository(*neo4jDriver)
-
 	ingredient := model.Ingredient{Id: id, Name: "test ingredient updated"}
 	updatedIngredient, err := repo.Update(ctx, ingredient)
 
@@ -227,7 +214,7 @@ func testUpdate(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *te
 	assert.Nil(updatedIngredient.Deleted)
 }
 
-func testDeleteNoConnections(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
+func testDeleteNoConnectionsIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
 	// seed data
 	id := "123"
 
@@ -249,7 +236,6 @@ func testDeleteNoConnections(ctx context.Context, neo4jDriver *neo4j.DriverWithC
 	}
 
 	// test
-	repo := repository.NewIngredientRepository(*neo4jDriver)
 	deletedId, err := repo.Delete(ctx, id)
 
 	// TODO make a direct Cypher query to verify anything about the state of the graph?
@@ -259,11 +245,12 @@ func testDeleteNoConnections(ctx context.Context, neo4jDriver *neo4j.DriverWithC
 	assert.Equal(id, deletedId)
 }
 
-func testDeleteWithConnections(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, t *testing.T) {
+func testDeleteWithConnectionsIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
 	// seed data
 	id := "123"
 
-	query := "CREATE (:Ingredient {id: $id, name: $name, created: $created})<-[:CONTAINS_INGREDIENT {created: $created}]-(:Recipe {created: $created})"
+	// TODO an undeleted :CONTAINS_RELATIONSHIP pointing at the food to delete should cause an error
+	query := "CREATE (:Ingredient {id: $id, name: $name, created: $created})<-[:CONTAINS_INGREDIENT {created: $created}]-(:Recipe:Resource {created: $created})"
 	createdTime := time.Now()
 	params := map[string]any{
 		"id":      id,
@@ -281,10 +268,9 @@ func testDeleteWithConnections(ctx context.Context, neo4jDriver *neo4j.DriverWit
 	}
 
 	// test
-	repo := repository.NewIngredientRepository(*neo4jDriver)
 	deletedId, err := repo.Delete(ctx, id)
 
-	// TODO make a direct Cypher query to verify anything about the state of the graph?
+	// TODO make a direct Cypher query to verify the relationship was marked as deleted OR store an id on relationships and return the deleted relationship ids
 
 	assert := assert.New(t)
 	assert.NoError(err)
