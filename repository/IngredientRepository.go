@@ -136,7 +136,7 @@ func (r *IngredientRepository) Create(ctx context.Context, ingredient model.Ingr
 func (r *IngredientRepository) Update(ctx context.Context, ingredient model.Ingredient) (*model.Ingredient, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Ingredient, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
-			*query = fmt.Sprintf("%s SET i.name = $name, i.lastModified = $lastModified\n"+
+			*query = fmt.Sprintf("%s SET i += {name: $name, lastModified: $lastModified}\n"+
 				"RETURN i",
 				MatchNodeById("i", []string{IngredientLabel}))
 			params = map[string]any{
@@ -165,7 +165,7 @@ func (r *IngredientRepository) Update(ctx context.Context, ingredient model.Ingr
 func (r *IngredientRepository) Delete(ctx context.Context, id string) (string, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (string, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
-			*query = fmt.Sprintf("%s MATCH (i)-[rel]-(:`%s`) WHERE rel.deleted IS NULL\n"+
+			*query = fmt.Sprintf("%s OPTIONAL MATCH (i)-[rel]-(:`%s`) WHERE rel.deleted IS NULL\n"+
 				"SET i.deleted = $deleted, rel.deleted = $deleted\n"+
 				"RETURN i.id AS id",
 				MatchNodeById("i", []string{IngredientLabel}), ResourceLabel)

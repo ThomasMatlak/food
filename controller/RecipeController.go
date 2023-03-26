@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/ThomasMatlak/food/controller/request"
 	"github.com/ThomasMatlak/food/controller/response"
@@ -80,10 +79,6 @@ func (rc *RecipeController) createRecipe(w http.ResponseWriter, r *http.Request)
 	newRecipe.Ingredients = createRecipeRequest.Ingredients
 	newRecipe.Steps = createRecipeRequest.Steps
 
-	// TODO handle creation time in controllers, repositories, or on the db?
-	newRecipe.Created = new(time.Time)
-	*newRecipe.Created = time.Now()
-
 	recipe, err := rc.recipeRepository.Create(r.Context(), newRecipe)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -122,10 +117,6 @@ func (rc *RecipeController) replaceRecipe(w http.ResponseWriter, r *http.Request
 	}
 	recipe.Ingredients = replaceRecipeRequest.Ingredients
 	recipe.Steps = replaceRecipeRequest.Steps
-
-	// TODO handle lastModified time in controllers, repositories, or on the db?
-	recipe.LastModified = new(time.Time)
-	*recipe.LastModified = time.Now()
 
 	updatedRecipe, err := rc.recipeRepository.Update(r.Context(), *recipe)
 	if err != nil {
@@ -172,10 +163,6 @@ func (rc *RecipeController) updateRecipe(w http.ResponseWriter, r *http.Request)
 	if updateRecipeRequest.Steps != nil {
 		recipe.Steps = *updateRecipeRequest.Steps
 	}
-
-	// TODO handle lastModified time in controllers or repositories?
-	recipe.LastModified = new(time.Time)
-	*recipe.LastModified = time.Now()
 
 	updatedRecipe, err := rc.recipeRepository.Update(r.Context(), *recipe)
 	if err != nil {

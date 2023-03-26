@@ -138,7 +138,6 @@ func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*mo
 				nodeVar := fmt.Sprintf("i%d", i)
 				unitVar := fmt.Sprintf("i%dUnit", i)
 				amountVar := fmt.Sprintf("i%dAmount", i)
-				// TODO fail if ingredient does not exist or has been deleted
 				statement := fmt.Sprintf("%s CREATE (r)-[:`%s` {unit: $%s, amount: $%s, created: $created}]->(%s)",
 					MatchNodeById(nodeVar, []string{IngredientLabel}), ContainsIngredientLabel, unitVar, amountVar, nodeVar)
 
@@ -166,7 +165,7 @@ func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*mo
 				"title":       recipe.Title,
 				"description": recipe.Description,
 				"steps":       recipe.Steps,
-				"created":     neo4j.LocalDateTime(*recipe.Created),
+				"created":     neo4j.LocalDateTime(time.Now()),
 			}
 			for k, v := range ingredientIdParams {
 				params[k] = v
@@ -285,7 +284,7 @@ func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*mo
 				"description":  recipe.Description,
 				"title":        recipe.Title,
 				"steps":        recipe.Steps,
-				"lastModified": neo4j.LocalDateTime(*recipe.LastModified),
+				"lastModified": neo4j.LocalDateTime(time.Now()),
 			}
 			for k, v := range ingredientIdParams {
 				params[k] = v

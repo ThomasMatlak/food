@@ -8,6 +8,9 @@ import (
 
 func ParseContainsIngredientRelationship(ingredient *dbtype.Node, rel *dbtype.Relationship) (*model.ContainsIngredient, error) {
 	ingredientId, err := neo4j.GetProperty[string](ingredient, "id")
+	if err != nil {
+		return nil, err
+	}
 
 	unit, err := neo4j.GetProperty[string](rel, "unit")
 	if err != nil {
