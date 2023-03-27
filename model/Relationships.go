@@ -7,3 +7,5 @@ type ContainsIngredient struct {
 	// TODO order
 	Resource
 }
+
+func ExtractIngredientId(ci ContainsIngredient) string { return ci.IngredientId }

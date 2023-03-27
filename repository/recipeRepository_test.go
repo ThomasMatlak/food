@@ -262,7 +262,7 @@ func testCreateRecipe(ctx context.Context, neo4jDriver *neo4j.DriverWithContext,
 	assert.NotEmpty(createdRecipe.Id)
 	assert.Equal(title, createdRecipe.Title)
 	assert.Equal(description, *createdRecipe.Description)
-	assert.Equal(len(ingredients), len(createdRecipe.Ingredients)) // TODO compare the actual ingredient ids
+	assert.ElementsMatch(util.MapArray(ingredients, model.ExtractIngredientId), util.MapArray(createdRecipe.Ingredients, model.ExtractIngredientId))
 	assert.WithinDuration(time.Now(), *createdRecipe.Created, time.Duration(1_000_000_000))
 	assert.Nil(createdRecipe.LastModified)
 	assert.Nil(createdRecipe.Deleted)
@@ -307,7 +307,7 @@ func testCreateRecipeNoDescription(ctx context.Context, neo4jDriver *neo4j.Drive
 	assert.NotEmpty(createdRecipe.Id)
 	assert.Equal(title, createdRecipe.Title)
 	assert.Nil(createdRecipe.Description)
-	assert.Equal(len(ingredients), len(createdRecipe.Ingredients)) // TODO compare the actual ingredient ids
+	assert.ElementsMatch(util.MapArray(ingredients, model.ExtractIngredientId), util.MapArray(createdRecipe.Ingredients, model.ExtractIngredientId))
 	assert.WithinDuration(time.Now(), *createdRecipe.Created, time.Duration(1_000_000_000))
 	assert.Nil(createdRecipe.LastModified)
 	assert.Nil(createdRecipe.Deleted)
@@ -416,7 +416,7 @@ func testUpdateRecipeNoIngredientsChanged(ctx context.Context, neo4jDriver *neo4
 	assert.Equal("test recipe updated", updatedRecipe.Title)
 	assert.Equal("tastes okay", *updatedRecipe.Description)
 	assert.Equal([]string{"do prep work", "cook it"}, updatedRecipe.Steps)
-	assert.ElementsMatch([]string{"123"}, util.MapArray(updatedRecipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.IngredientId }))
+	assert.ElementsMatch([]string{"123"}, util.MapArray(updatedRecipe.Ingredients, model.ExtractIngredientId))
 	assert.WithinDuration(createdTime, *updatedRecipe.Created, 0)
 	assert.True((*updatedRecipe.LastModified).After(createdTime))
 	assert.Nil(updatedRecipe.Deleted)
@@ -468,7 +468,7 @@ func testUpdateRecipeIngredientAdded(ctx context.Context, neo4jDriver *neo4j.Dri
 	assert.Equal("test recipe updated", updatedRecipe.Title)
 	assert.Equal("tastes okay", *updatedRecipe.Description)
 	assert.Equal([]string{"do prep work", "cook it"}, updatedRecipe.Steps)
-	assert.ElementsMatch([]string{"123", "456"}, util.MapArray(updatedRecipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.IngredientId }))
+	assert.ElementsMatch([]string{"123", "456"}, util.MapArray(updatedRecipe.Ingredients, model.ExtractIngredientId))
 	assert.WithinDuration(createdTime, *updatedRecipe.Created, 0)
 	assert.True((*updatedRecipe.LastModified).After(createdTime))
 	assert.Nil(updatedRecipe.Deleted)
@@ -519,7 +519,7 @@ func testUpdateRecipeIngredientRemoved(ctx context.Context, neo4jDriver *neo4j.D
 	assert.Equal("test recipe updated", updatedRecipe.Title)
 	assert.Equal("tastes okay", *updatedRecipe.Description)
 	assert.Equal([]string{"do prep work", "cook it"}, updatedRecipe.Steps)
-	assert.ElementsMatch([]string{"123"}, util.MapArray(updatedRecipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.IngredientId }))
+	assert.ElementsMatch([]string{"123"}, util.MapArray(updatedRecipe.Ingredients, model.ExtractIngredientId))
 	assert.WithinDuration(createdTime, *updatedRecipe.Created, 0)
 	assert.True((*updatedRecipe.LastModified).After(createdTime))
 	assert.Nil(updatedRecipe.Deleted)
@@ -571,7 +571,7 @@ func testUpdateRecipeIngredientsKeptAddedRemoved(ctx context.Context, neo4jDrive
 	assert.Equal("test recipe updated", updatedRecipe.Title)
 	assert.Equal("tastes okay", *updatedRecipe.Description)
 	assert.Equal([]string{"do prep work", "cook it"}, updatedRecipe.Steps)
-	assert.ElementsMatch([]string{"123", "789"}, util.MapArray(updatedRecipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.IngredientId }))
+	assert.ElementsMatch([]string{"123", "789"}, util.MapArray(updatedRecipe.Ingredients, model.ExtractIngredientId))
 	assert.WithinDuration(createdTime, *updatedRecipe.Created, 0)
 	assert.True((*updatedRecipe.LastModified).After(createdTime))
 	assert.Nil(updatedRecipe.Deleted)
@@ -609,7 +609,7 @@ func testUpdateRecipeReaddIngredient(ctx context.Context, neo4jDriver *neo4j.Dri
 	_, err = neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
 		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
 			query := "MATCH (:Recipe {id: $recipeId})-[rel:CONTAINS_INGREDIENT]->(:Ingredient {id: $ingredientId}) SET rel.deleted = $deleted"
-			params := map[string]any{"recipeId": "123", "ingredientId": "456", "deleted": neo4j.LocalDateTime(time.Now())}
+			params := map[string]any{"recipeId": id, "ingredientId": "456", "deleted": neo4j.LocalDateTime(time.Now())}
 			return tx.Run(ctx, query, params)
 		})
 	if err != nil {
@@ -633,7 +633,7 @@ func testUpdateRecipeReaddIngredient(ctx context.Context, neo4jDriver *neo4j.Dri
 	assert.Equal("test recipe updated", updatedRecipe.Title)
 	assert.Equal("tastes okay", *updatedRecipe.Description)
 	assert.Equal([]string{"do prep work", "cook it"}, updatedRecipe.Steps)
-	assert.ElementsMatch([]string{"123", "456"}, util.MapArray(updatedRecipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.IngredientId }))
+	assert.ElementsMatch([]string{"123", "456"}, util.MapArray(updatedRecipe.Ingredients, model.ExtractIngredientId))
 	assert.WithinDuration(createdTime, *updatedRecipe.Created, 0)
 	assert.True((*updatedRecipe.LastModified).After(createdTime))
 	assert.Nil(updatedRecipe.Deleted)
