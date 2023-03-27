@@ -132,43 +132,37 @@ func (r *RecipeRepository) GetById(ctx context.Context, id string) (*model.Recip
 func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*model.Recipe, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Recipe, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
-			relateIngredientStmts := []string{}
-			ingredientIdParams := map[string]any{}
-			for i, containsIngredient := range recipe.Ingredients {
-				nodeVar := fmt.Sprintf("i%d", i)
-				unitVar := fmt.Sprintf("i%dUnit", i)
-				amountVar := fmt.Sprintf("i%dAmount", i)
-				statement := fmt.Sprintf("%s CREATE (r)-[:`%s` {unit: $%s, amount: $%s, created: $created}]->(%s)",
-					MatchNodeById(nodeVar, []string{IngredientLabel}), ContainsIngredientLabel, unitVar, amountVar, nodeVar)
-
-				relateIngredientStmts = append(relateIngredientStmts, statement)
-				ingredientIdParams[fmt.Sprintf("%sId", nodeVar)] = containsIngredient.IngredientId
-				ingredientIdParams[fmt.Sprintf("%sUnit", nodeVar)] = containsIngredient.Unit
-				ingredientIdParams[fmt.Sprintf("%sAmount", nodeVar)] = containsIngredient.Amount
-			}
-
 			labels := []string{RecipeLabel, ResourceLabel}
 			id, err := model.ResourceId(labels)
 			if err != nil {
 				return nil, err
 			}
-
+			// TODO fail the query if any 1 of the ingredients is not found
 			*query = fmt.Sprintf("CREATE (r:`%s`) SET r = {id: $id, title: $title, description: $description, steps: $steps, created: $created}\n"+
-				"WITH r %s\n"+
-				"WITH r MATCH (r)-[ci:`%s`]->(i:`%s`)\n"+ // the node and relationships have just been created, so no need to check they are not deleted
+				"WITH r UNWIND $ingredients AS ingredient\n"+
+				"MATCH (i:`%s` {id: ingredient.id}) WHERE i.deleted IS NULL\n"+
+				"CREATE (r)-[ci:`%s` {unit: ingredient.unit, amount: ingredient.amount, created: $created}]->(i)\n"+
 				"RETURN r AS recipe, collect({ingredient: i, rel: ci}) AS ingredients",
 				strings.Join(labels, "`:`"),
-				strings.Join(relateIngredientStmts, "\nWITH r "),
-				ContainsIngredientLabel, IngredientLabel)
+				IngredientLabel,
+				ContainsIngredientLabel,
+			)
+
+			ingredientParams := []map[string]any{}
+			for _, ci := range recipe.Ingredients {
+				ingredient := map[string]any{}
+				ingredient["id"] = ci.IngredientId
+				ingredient["unit"] = ci.Unit
+				ingredient["amount"] = ci.Amount
+				ingredientParams = append(ingredientParams, ingredient)
+			}
 			params = map[string]any{
 				"id":          id,
 				"title":       recipe.Title,
 				"description": recipe.Description,
 				"steps":       recipe.Steps,
+				"ingredients": ingredientParams,
 				"created":     neo4j.LocalDateTime(time.Now()),
-			}
-			for k, v := range ingredientIdParams {
-				params[k] = v
 			}
 
 			record, err := RunAndReturnSingleRecord(ctx, tx, *query, params)
@@ -230,64 +224,66 @@ func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*mo
 			addedIngredientIds := util.Difference(newIngredientIds, existingIngredientIds)
 			updatedIngredientIds := util.Intersection(existingIngredientIds, newIngredientIds)
 
-			unRelateIngredientStms := []string{}
-			ingredientIdParams := map[string]any{}
-			for i, ingredientId := range util.SetToArray(removedIngredientIds) {
-				nodeVar := fmt.Sprintf("i%d", i)
-				relVar := fmt.Sprintf("ci%d", i)
-				statement := fmt.Sprintf("%s<-[`%s`:`%s`]-(r) SET `%s`.deleted = $lastModified",
-					MatchNodeById(nodeVar, []string{IngredientLabel}), relVar, ContainsIngredientLabel, relVar)
-				unRelateIngredientStms = append(unRelateIngredientStms, statement)
-				ingredientIdParams[fmt.Sprintf("%sId", nodeVar)] = ingredientId
+			removedIngredientParams := []map[string]string{}
+			for _, ingredientId := range util.SetToArray(removedIngredientIds) {
+				ingredient := map[string]string{"id": ingredientId}
+				removedIngredientParams = append(removedIngredientParams, ingredient)
+			}
+			addedIngredientParams := []map[string]any{}
+			for _, ingredientId := range util.SetToArray(addedIngredientIds) {
+				ingredient := map[string]any{"id": ingredientId, "unit": newIngredients[ingredientId].Unit, "amount": newIngredients[ingredientId].Amount}
+				addedIngredientParams = append(addedIngredientParams, ingredient)
+			}
+			updatedIngredientParams := []map[string]any{}
+			for _, ingredientId := range util.SetToArray(updatedIngredientIds) {
+				ingredient := map[string]any{"id": ingredientId, "unit": newIngredients[ingredientId].Unit, "amount": newIngredients[ingredientId].Amount}
+				updatedIngredientParams = append(updatedIngredientParams, ingredient)
 			}
 
-			offset := len(unRelateIngredientStms)
-			addIngredientStms := []string{}
-			for i, ingredientId := range util.SetToArray(addedIngredientIds) {
-				nodeVar := fmt.Sprintf("i%d", offset+i)
-				unitVar := fmt.Sprintf("i%dUnit", offset+i)
-				amountVar := fmt.Sprintf("i%dAmount", offset+i)
-				statement := fmt.Sprintf("%s CREATE (r)-[:`%s` {unit: $%s, amount: $%s, created: $lastModified}]->(`%s`)",
-					MatchNodeById(nodeVar, []string{IngredientLabel}), ContainsIngredientLabel, unitVar, amountVar, nodeVar)
-				addIngredientStms = append(addIngredientStms, statement)
-				ingredientIdParams[fmt.Sprintf("%sId", nodeVar)] = ingredientId
-				ingredientIdParams[fmt.Sprintf("%sUnit", nodeVar)] = newIngredients[ingredientId].Unit
-				ingredientIdParams[fmt.Sprintf("%sAmount", nodeVar)] = newIngredients[ingredientId].Amount
+			// TODO It may be possilbe to always include all 3 cases in the query:
+			// https://neo4j.com/docs/cypher-manual/current/clauses/unwind/#unwind-using-unwind-with-an-empty-list
+			// Using a plain UNWIND does not return any rows and will end the query execution early if e.g. there are no removed ingredients
+			removeIngredientsStatement := fmt.Sprintf("WITH r UNWIND $removedIngredients AS ingredient\n"+
+				"MATCH (r)-[ci:`%s`]->(:`%s` {id: ingredient.id}) SET ci.deleted = $lastModified\n",
+				ContainsIngredientLabel, IngredientLabel,
+			)
+			addIngredientsStatement := fmt.Sprintf("WITH r UNWIND $addedIngredients AS ingredient\n"+
+				"MATCH (i:`%s` {id: ingredient.id})\n"+
+				"CREATE (r)-[:`%s` {unit: ingredient.unit, amount: ingredient.amount, created: $lastModified}]->(i)\n",
+				IngredientLabel,
+				ContainsIngredientLabel,
+			)
+			updateIngredientsStatement := fmt.Sprintf("WITH r UNWIND $updatedIngredients AS ingredient\n"+
+				"MATCH (r)-[ci:`%s`]->(:`%s` {id: ingredient.id}) SET ci += {unit: ingredient.unit, amount: ingredient.amount, lastModified: $lastModified}\n",
+				ContainsIngredientLabel, IngredientLabel,
+			)
+
+			*query = fmt.Sprintf("MATCH (r:`%s` {id: $id}) SET r += {title: $title, description: $description, steps: $steps, lastModified: $lastModified}\n",
+				RecipeLabel,
+			)
+			if len(removedIngredientParams) > 0 {
+				*query = *query + removeIngredientsStatement
 			}
-
-			offset += len(addIngredientStms)
-			updateIngredientStms := []string{}
-			for i, ingredientId := range util.SetToArray(updatedIngredientIds) {
-				nodeVar := fmt.Sprintf("i%d", offset+i)
-				relVar := fmt.Sprintf("ci%d", offset+i)
-				unitVar := fmt.Sprintf("i%dUnit", offset+i)
-				amountVar := fmt.Sprintf("i%dAmount", offset+i)
-				statement := fmt.Sprintf("%s MATCH (r)-[`%s`:`%s`]->(`%s`) SET `%s` += {unit: $%s, amount: $%s, lastModified: $lastModified}",
-					MatchNodeById(nodeVar, []string{IngredientLabel}), relVar, ContainsIngredientLabel, nodeVar, relVar, unitVar, amountVar)
-				updateIngredientStms = append(updateIngredientStms, statement)
-				ingredientIdParams[fmt.Sprintf("%sId", nodeVar)] = ingredientId
-				ingredientIdParams[fmt.Sprintf("%sUnit", nodeVar)] = newIngredients[ingredientId].Unit
-				ingredientIdParams[fmt.Sprintf("%sAmount", nodeVar)] = newIngredients[ingredientId].Amount
+			if len(addedIngredientParams) > 0 {
+				*query = *query + addIngredientsStatement
 			}
-
-			relStmts := append(append(unRelateIngredientStms, addIngredientStms...), updateIngredientStms...)
-
-			*query = fmt.Sprintf("%s SET r += {title: $title, description: $description, steps: $steps, lastModified: $lastModified}\n"+
-				"WITH r %s\n"+
-				"WITH r MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
+			if len(updatedIngredientParams) > 0 {
+				*query = *query + updateIngredientsStatement
+			}
+			*query = *query + fmt.Sprintf("WITH r MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL\n"+
 				"RETURN r AS recipe, collect({ingredient: i, rel: ci}) AS ingredients",
-				MatchNodeById("r", []string{RecipeLabel}),
-				strings.Join(relStmts, "\nWITH r "),
-				ContainsIngredientLabel, IngredientLabel)
+				ContainsIngredientLabel, IngredientLabel,
+			)
+
 			params = map[string]any{
-				"rId":          recipe.Id,
-				"description":  recipe.Description,
-				"title":        recipe.Title,
-				"steps":        recipe.Steps,
-				"lastModified": neo4j.LocalDateTime(time.Now()),
-			}
-			for k, v := range ingredientIdParams {
-				params[k] = v
+				"id":                 recipe.Id,
+				"description":        recipe.Description,
+				"title":              recipe.Title,
+				"steps":              recipe.Steps,
+				"removedIngredients": removedIngredientParams,
+				"addedIngredients":   addedIngredientParams,
+				"updatedIngredients": updatedIngredientParams,
+				"lastModified":       neo4j.LocalDateTime(time.Now()),
 			}
 
 			record, err := RunAndReturnSingleRecord(ctx, tx, *query, params)
