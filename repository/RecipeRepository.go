@@ -129,6 +129,26 @@ func (r *RecipeRepository) GetById(ctx context.Context, id string) (*model.Recip
 	return recipe, true, nil
 }
 
+func checkIngredientsExist(ctx context.Context, tx neo4j.ManagedTransaction, ingredientIds util.Set[string]) (bool, error) {
+	query := fmt.Sprintf("MATCH (i:`%s`) WHERE i.id IN $ids AND i.deleted IS NULL\n"+ // TODO IN, or UNWIND? any performance difference?
+		"RETURN count(DISTINCT i) AS c",
+		IngredientLabel,
+	)
+	params := map[string]any{"ids": util.SetToArray(ingredientIds)}
+
+	record, err := RunAndReturnSingleRecord(ctx, tx, query, params)
+	if err != nil {
+		return false, err
+	}
+
+	ingredientCount, found := TypedGet[int64](record, "c")
+	if !found {
+		return false, errors.New("could not find column c")
+	}
+
+	return ingredientCount == int64(len(ingredientIds)), nil
+}
+
 func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*model.Recipe, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Recipe, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Recipe, error) {
@@ -137,6 +157,17 @@ func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*mo
 			if err != nil {
 				return nil, err
 			}
+
+			// TODO is this possible to do in the same query as creating the relationships without getting super ugly?
+			ingredientIds := util.ArrayToSet(util.MapArray(recipe.Ingredients, model.ExtractIngredientId))
+			ingredientsExist, err := checkIngredientsExist(ctx, tx, ingredientIds)
+			if err != nil {
+				return nil, err
+			}
+			if !ingredientsExist {
+				return nil, errors.New("tried to create a recipe with non-existent ingredient(s)")
+			}
+
 			// TODO fail the query if any 1 of the ingredients is not found
 			*query = fmt.Sprintf("CREATE (r:`%s`) SET r = {id: $id, title: $title, description: $description, steps: $steps, created: $created}\n"+
 				"WITH r UNWIND $ingredients AS ingredient\n"+
@@ -217,12 +248,22 @@ func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*mo
 				existingIngredients[ci.IngredientId] = ci
 			}
 
-			newIngredientIds := util.ArrayToSet(util.MapArray(recipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.IngredientId }))
-			existingIngredientIds := util.ArrayToSet(util.MapArray(existingRecipe.Ingredients, func(ci model.ContainsIngredient) string { return ci.IngredientId }))
+			newIngredientIds := util.ArrayToSet(util.MapArray(recipe.Ingredients, model.ExtractIngredientId))
+			existingIngredientIds := util.ArrayToSet(util.MapArray(existingRecipe.Ingredients, model.ExtractIngredientId))
 
 			removedIngredientIds := util.Difference(existingIngredientIds, newIngredientIds)
 			addedIngredientIds := util.Difference(newIngredientIds, existingIngredientIds)
 			updatedIngredientIds := util.Intersection(existingIngredientIds, newIngredientIds)
+
+			// check that newly added ingredients exist
+			// probably no need to check removed or updated ingredients
+			ingredientsExist, err := checkIngredientsExist(ctx, tx, addedIngredientIds)
+			if err != nil {
+				return nil, err
+			}
+			if !ingredientsExist {
+				return nil, errors.New("tried to create a recipe with non-existent ingredient(s)")
+			}
 
 			removedIngredientParams := []map[string]string{}
 			for _, ingredientId := range util.SetToArray(removedIngredientIds) {
