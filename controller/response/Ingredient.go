@@ -2,10 +2,10 @@ package response
 
 import "github.com/ThomasMatlak/food/model"
 
-type GetIngredientsResponse struct {
-	Ingredients []model.Ingredient `json:"ingredients"`
+type GetFoodsResponse struct {
+	Foods []model.Food `json:"ingredients"`
 }
 
-type DeleteIngredientResponse struct {
+type DeleteFoodResponse struct {
 	Id string `json:"id"`
 }

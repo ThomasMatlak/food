@@ -2,17 +2,17 @@ package model
 
 import "context"
 
-type Ingredient struct {
+type Food struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
 	// TODO nutrition
 	Resource
 }
 
-type IngredientRepository interface {
-	GetAll(ctx context.Context) ([]Ingredient, error)
-	GetById(ctx context.Context, id string) (*Ingredient, bool, error)
-	Create(ctx context.Context, ingredient Ingredient) (*Ingredient, error)
-	Update(ctx context.Context, ingredient Ingredient) (*Ingredient, error)
+type FoodRepository interface {
+	GetAll(ctx context.Context) ([]Food, error)
+	GetById(ctx context.Context, id string) (*Food, bool, error)
+	Create(ctx context.Context, food Food) (*Food, error)
+	Update(ctx context.Context, food Food) (*Food, error)
 	Delete(ctx context.Context, id string) (string, error)
 }

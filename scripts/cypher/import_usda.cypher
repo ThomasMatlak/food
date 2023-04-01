@@ -14,7 +14,7 @@ CREATE TEXT INDEX nutrient_id_idx IF NOT EXISTS
 FOR (n:Nutrient)
 ON n.id;
 
-CREATE FULLTEXT INDEX ingredient_name_search_idx IF NOT EXISTS
+CREATE FULLTEXT INDEX nutrient_name_search_idx IF NOT EXISTS
 FOR (n:Nutrient)
 ON EACH [n.name];
 

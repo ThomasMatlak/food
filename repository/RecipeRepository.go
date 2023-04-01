@@ -28,7 +28,7 @@ func (r *RecipeRepository) GetAll(ctx context.Context) ([]model.Recipe, error) {
 				"MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
 				"RETURN r AS recipe, collect({ingredient: i, rel: ci}) AS ingredients",
 				RecipeLabel,
-				ContainsIngredientLabel, IngredientLabel)
+				ContainsIngredientLabel, FoodLabel)
 			params = map[string]any{}
 
 			result, err := tx.Run(ctx, *query, params)
@@ -84,7 +84,7 @@ func (r *RecipeRepository) GetById(ctx context.Context, id string) (*model.Recip
 				"MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL AND i.deleted IS NULL\n"+
 				"RETURN r AS recipe, collect({ingredient: i, rel: ci}) AS ingredients",
 				MatchNodeById("r", []string{RecipeLabel}),
-				ContainsIngredientLabel, IngredientLabel)
+				ContainsIngredientLabel, FoodLabel)
 			params = map[string]any{
 				"rId": id,
 			}
@@ -132,7 +132,7 @@ func (r *RecipeRepository) GetById(ctx context.Context, id string) (*model.Recip
 func checkIngredientsExist(ctx context.Context, tx neo4j.ManagedTransaction, ingredientIds util.Set[string]) (bool, error) {
 	query := fmt.Sprintf("MATCH (i:`%s`) WHERE i.id IN $ids AND i.deleted IS NULL\n"+ // TODO IN, or UNWIND? any performance difference?
 		"RETURN count(DISTINCT i) AS c",
-		IngredientLabel,
+		FoodLabel,
 	)
 	params := map[string]any{"ids": util.SetToArray(ingredientIds)}
 
@@ -175,7 +175,7 @@ func (r *RecipeRepository) Create(ctx context.Context, recipe model.Recipe) (*mo
 				"CREATE (r)-[ci:`%s` {unit: ingredient.unit, amount: ingredient.amount, created: $created}]->(i)\n"+
 				"RETURN r AS recipe, collect({ingredient: i, rel: ci}) AS ingredients",
 				strings.Join(labels, "`:`"),
-				IngredientLabel,
+				FoodLabel,
 				ContainsIngredientLabel,
 			)
 
@@ -286,17 +286,17 @@ func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*mo
 			// Using a plain UNWIND does not return any rows and will end the query execution early if e.g. there are no removed ingredients
 			removeIngredientsStatement := fmt.Sprintf("WITH r UNWIND $removedIngredients AS ingredient\n"+
 				"MATCH (r)-[ci:`%s`]->(:`%s` {id: ingredient.id}) SET ci.deleted = $lastModified\n",
-				ContainsIngredientLabel, IngredientLabel,
+				ContainsIngredientLabel, FoodLabel,
 			)
 			addIngredientsStatement := fmt.Sprintf("WITH r UNWIND $addedIngredients AS ingredient\n"+
 				"MATCH (i:`%s` {id: ingredient.id})\n"+
 				"CREATE (r)-[:`%s` {unit: ingredient.unit, amount: ingredient.amount, created: $lastModified}]->(i)\n",
-				IngredientLabel,
+				FoodLabel,
 				ContainsIngredientLabel,
 			)
 			updateIngredientsStatement := fmt.Sprintf("WITH r UNWIND $updatedIngredients AS ingredient\n"+
 				"MATCH (r)-[ci:`%s`]->(:`%s` {id: ingredient.id}) SET ci += {unit: ingredient.unit, amount: ingredient.amount, lastModified: $lastModified}\n",
-				ContainsIngredientLabel, IngredientLabel,
+				ContainsIngredientLabel, FoodLabel,
 			)
 
 			*query = fmt.Sprintf("MATCH (r:`%s` {id: $id}) SET r += {title: $title, description: $description, steps: $steps, lastModified: $lastModified}\n",
@@ -313,7 +313,7 @@ func (r *RecipeRepository) Update(ctx context.Context, recipe model.Recipe) (*mo
 			}
 			*query = *query + fmt.Sprintf("WITH r MATCH (r)-[ci:`%s`]->(i:`%s`) WHERE ci.deleted IS NULL\n"+
 				"RETURN r AS recipe, collect({ingredient: i, rel: ci}) AS ingredients",
-				ContainsIngredientLabel, IngredientLabel,
+				ContainsIngredientLabel, FoodLabel,
 			)
 
 			params = map[string]any{

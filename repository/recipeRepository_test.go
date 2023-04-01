@@ -98,12 +98,12 @@ func TestRecipeRepository(t *testing.T) {
 }
 
 var seedIngredientsAndRecipes string = `UNWIND $ingredients AS ingredient
-MERGE (i:Ingredient {id: ingredient.id}) SET i+= {name: ingredient.name, created: $created}
+MERGE (i:Food {id: ingredient.id}) SET i+= {name: ingredient.name, created: $created}
 WITH '' AS throwaway
 UNWIND $recipes AS recipe
 MERGE (r:Recipe {id : recipe.id}) SET r += {title: recipe.title, description: recipe.description, steps: recipe.steps, created: $created}
 WITH recipe, r UNWIND recipe.ingredients AS ingredient
-MATCH (i:Ingredient {id: ingredient.ingredient_id})
+MATCH (i:Food {id: ingredient.ingredient_id})
 MERGE (r)-[rel:CONTAINS_INGREDIENT]->(i) SET rel = {unit: ingredient.unit, amount: ingredient.amount, created: $created}`
 
 func testGetOneRecipe(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.RecipeRepository, t *testing.T) {
@@ -114,7 +114,7 @@ func testGetOneRecipe(ctx context.Context, neo4jDriver *neo4j.DriverWithContext,
 	ingredientId := "test ingredient id"
 	steps := []string{"peel the onion", "eat the onion like an apple", "enjoy! :)"}
 
-	query := "CREATE (:Recipe {id: $id, title: $title, description: $description, steps: $steps, created: $created})-[:CONTAINS_INGREDIENT {unit: $unit, amount: $amount, created: $created}]->(:Ingredient {id: $ingredientId, name: 'onion', created: $created})"
+	query := "CREATE (:Recipe {id: $id, title: $title, description: $description, steps: $steps, created: $created})-[:CONTAINS_INGREDIENT {unit: $unit, amount: $amount, created: $created}]->(:Food {id: $ingredientId, name: 'onion', created: $created})"
 	createdTime := time.Now()
 	params := map[string]any{
 		"id":           recipeId,
@@ -219,12 +219,12 @@ func testGetAllEmptyRecipe(ctx context.Context, neo4jDriver *neo4j.DriverWithCon
 
 	assert := assert.New(t)
 	assert.NoError(err)
-	assert.Empty([]model.Ingredient{}, recipes)
+	assert.Empty([]model.Food{}, recipes)
 }
 
 func testCreateRecipe(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.RecipeRepository, t *testing.T) {
 	// seed data
-	query := "UNWIND $ingredients AS i CREATE (:Ingredient {id: i.id, name: i.name, created: $created})"
+	query := "UNWIND $ingredients AS i CREATE (:Food {id: i.id, name: i.name, created: $created})"
 	ingredientParams := []map[string]string{
 		{"id": "asdf", "name": "rice"},
 		{"id": "zxcv", "name": "beans"},
@@ -270,7 +270,7 @@ func testCreateRecipe(ctx context.Context, neo4jDriver *neo4j.DriverWithContext,
 
 func testCreateRecipeNoDescription(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.RecipeRepository, t *testing.T) {
 	// seed data
-	query := "UNWIND $ingredients AS i CREATE (:Ingredient {id: i.id, name: i.name, created: $created})"
+	query := "UNWIND $ingredients AS i CREATE (:Food {id: i.id, name: i.name, created: $created})"
 	ingredientParams := []map[string]string{
 		{"id": "asdf", "name": "rice"},
 		{"id": "zxcv", "name": "beans"},
@@ -315,7 +315,7 @@ func testCreateRecipeNoDescription(ctx context.Context, neo4jDriver *neo4j.Drive
 
 func testCreateRecipeOneIngredientNotFound(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.RecipeRepository, t *testing.T) {
 	// seed data
-	query := "UNWIND $ingredients AS i CREATE (:Ingredient {id: i.id, name: i.name, created: $created})"
+	query := "UNWIND $ingredients AS i CREATE (:Food {id: i.id, name: i.name, created: $created})"
 	ingredientParams := []map[string]string{
 		{"id": "asdf", "name": "rice"},
 	}
@@ -608,7 +608,7 @@ func testUpdateRecipeReaddIngredient(ctx context.Context, neo4jDriver *neo4j.Dri
 	}
 	_, err = neo4j.ExecuteWrite(ctx, (*neo4jDriver).NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}),
 		func(tx neo4j.ManagedTransaction) (neo4j.ResultWithContext, error) {
-			query := "MATCH (:Recipe {id: $recipeId})-[rel:CONTAINS_INGREDIENT]->(:Ingredient {id: $ingredientId}) SET rel.deleted = $deleted"
+			query := "MATCH (:Recipe {id: $recipeId})-[rel:CONTAINS_INGREDIENT]->(:Food {id: $ingredientId}) SET rel.deleted = $deleted"
 			params := map[string]any{"recipeId": id, "ingredientId": "456", "deleted": neo4j.LocalDateTime(time.Now())}
 			return tx.Run(ctx, query, params)
 		})
@@ -731,7 +731,7 @@ func testDeleteRecipe(ctx context.Context, neo4jDriver *neo4j.DriverWithContext,
 	// seed data
 	id := "123"
 
-	query := "CREATE (:Recipe {id: $id, title: $title, created: $created})-[:CONTAINS_INGREDIENT {created: $created}]->(:Ingredient:Resource {created: $created})"
+	query := "CREATE (:Recipe {id: $id, title: $title, created: $created})-[:CONTAINS_INGREDIENT {created: $created}]->(:Food:Resource {created: $created})"
 	createdTime := time.Now()
 	params := map[string]any{
 		"id":      id,

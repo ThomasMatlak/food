@@ -29,13 +29,13 @@ func main() {
 	recipeRepository := repository.NewRecipeRepository(driver)
 	recipeController := controller.NewRecipeController(recipeRepository)
 
-	ingredientRepository := repository.NewIngredientRepository(driver)
-	ingredientController := controller.NewIngredientController(ingredientRepository)
+	foodRepository := repository.NewFoodRepository(driver)
+	foodController := controller.NewFoodController(foodRepository)
 
 	router := mux.NewRouter().StrictSlash(true)
 
 	recipeController.RecipeRoutes(router)
-	ingredientController.IngredientRoutes(router)
+	foodController.FoodRoutes(router)
 
 	router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
 		pathTemplate, err := route.GetPathTemplate()

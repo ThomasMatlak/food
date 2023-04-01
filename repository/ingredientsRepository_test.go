@@ -15,7 +15,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func TestIngredientRepository(t *testing.T) {
+func TestFoodRepository(t *testing.T) {
 	ctx := context.Background()
 
 	neo4jContainer, err := startNeo4j(ctx, t)
@@ -30,51 +30,51 @@ func TestIngredientRepository(t *testing.T) {
 		t.FailNow()
 	}
 
-	repo := repository.NewIngredientRepository(*neo4jDriver)
+	repo := repository.NewFoodRepository(*neo4jDriver)
 
 	t.Run("Get One", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testGetOneIngredient(ctx, neo4jDriver, repo, t)
+		testGetOneFood(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Get One (does not exist)", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testGetOneDoesNotExistIngredient(ctx, neo4jDriver, repo, t)
+		testGetOneDoesNotExistFood(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Get All", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testGetAllIngredient(ctx, neo4jDriver, repo, t)
+		testGetAllFood(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Get All (empty)", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testGetAllEmptyIngredient(ctx, neo4jDriver, repo, t)
+		testGetAllEmptyFood(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Create", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testCreateIngredient(ctx, neo4jDriver, repo, t)
+		testCreateFood(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Update", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testUpdateIngredient(ctx, neo4jDriver, repo, t)
+		testUpdateFood(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Delete (no connections)", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testDeleteNoConnectionsIngredient(ctx, neo4jDriver, repo, t)
+		testDeleteNoConnectionsFood(ctx, neo4jDriver, repo, t)
 	})
 	t.Run("Delete (with connections)", func(t *testing.T) {
 		t.Cleanup(func() { clearNeo4j(ctx, neo4jDriver) })
-		testDeleteWithConnectionsIngredient(ctx, neo4jDriver, repo, t)
+		testDeleteWithConnectionsFood(ctx, neo4jDriver, repo, t)
 	})
 }
 
-func testGetOneIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
+func testGetOneFood(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.FoodRepository, t *testing.T) {
 	// seed data
 	id := "123"
 
-	query := "CREATE (:Ingredient {id: $id, name: $name, created: $created})"
+	query := "CREATE (:Food {id: $id, name: $name, created: $created})"
 	createdTime := time.Now()
 	params := map[string]any{
 		"id":      id,
-		"name":    "test ingredient",
+		"name":    "test food",
 		"created": neo4j.LocalDateTime(createdTime),
 	}
 
@@ -88,42 +88,42 @@ func testGetOneIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithCont
 	}
 
 	// test
-	ingredient, found, err := repo.GetById(ctx, id)
+	food, found, err := repo.GetById(ctx, id)
 
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.True(found)
-	assert.Equal(id, ingredient.Id)
-	assert.Equal("test ingredient", ingredient.Name)
-	assert.WithinDuration(createdTime, *ingredient.Created, 0)
-	assert.Nil(ingredient.LastModified)
-	assert.Nil(ingredient.Deleted)
+	assert.Equal(id, food.Id)
+	assert.Equal("test food", food.Name)
+	assert.WithinDuration(createdTime, *food.Created, 0)
+	assert.Nil(food.LastModified)
+	assert.Nil(food.Deleted)
 }
 
-func testGetOneDoesNotExistIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
+func testGetOneDoesNotExistFood(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.FoodRepository, t *testing.T) {
 	// no seed data
 
 	// test
-	ingredient, found, err := repo.GetById(ctx, "test id")
+	food, found, err := repo.GetById(ctx, "test id")
 
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.False(found)
-	assert.Nil(ingredient)
+	assert.Nil(food)
 }
 
-func testGetAllIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
+func testGetAllFood(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.FoodRepository, t *testing.T) {
 	// seed data
-	seedIngredients := []model.Ingredient{
-		{Id: "123", Name: "test ingredient 1"},
-		{Id: "456", Name: "test ingredient 2"},
+	seedFoods := []model.Food{
+		{Id: "123", Name: "test food 1"},
+		{Id: "456", Name: "test food 2"},
 	}
 
-	input := util.MapArray(seedIngredients, func(i model.Ingredient) map[string]string {
+	input := util.MapArray(seedFoods, func(i model.Food) map[string]string {
 		return map[string]string{"id": i.Id, "name": i.Name}
 	})
 
-	query := "UNWIND $input AS i CREATE (:Ingredient {id: i.id, name: i.name, created: $created})"
+	query := "UNWIND $input AS i CREATE (:Food {id: i.id, name: i.name, created: $created})"
 	createdTime := time.Now()
 	params := map[string]any{
 		"input":   input,
@@ -140,53 +140,53 @@ func testGetAllIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithCont
 	}
 
 	// test
-	ingredients, err := repo.GetAll(ctx)
+	foods, err := repo.GetAll(ctx)
 
 	assert := assert.New(t)
 	assert.NoError(err)
 	// comparing time stamps is tricky
-	ingredientsWithoutCreated := util.MapArray(ingredients, func(i model.Ingredient) model.Ingredient {
-		return model.Ingredient{Id: i.Id, Name: i.Name}
+	foodsWithoutCreated := util.MapArray(foods, func(i model.Food) model.Food {
+		return model.Food{Id: i.Id, Name: i.Name}
 	})
-	assert.ElementsMatch(seedIngredients, ingredientsWithoutCreated)
+	assert.ElementsMatch(seedFoods, foodsWithoutCreated)
 }
 
-func testGetAllEmptyIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
+func testGetAllEmptyFood(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.FoodRepository, t *testing.T) {
 	// no seed data
 
 	// test
-	ingredients, err := repo.GetAll(ctx)
+	foods, err := repo.GetAll(ctx)
 
 	assert := assert.New(t)
 	assert.NoError(err)
-	assert.Empty(ingredients)
+	assert.Empty(foods)
 }
 
-func testCreateIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
-	name := "test ingredient"
-	ingredient := model.Ingredient{Name: name}
-	createdIngredient, err := repo.Create(ctx, ingredient)
+func testCreateFood(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.FoodRepository, t *testing.T) {
+	name := "test food"
+	food := model.Food{Name: name}
+	createdFood, err := repo.Create(ctx, food)
 
 	// TODO make a direct Cypher query to verify anything about the state of the graph?
 
 	assert := assert.New(t)
 	assert.NoError(err)
-	assert.NotEmpty(createdIngredient.Id)
-	assert.Equal(name, createdIngredient.Name)
-	assert.WithinDuration(time.Now(), *createdIngredient.Created, time.Duration(1_000_000_000))
-	assert.Nil(createdIngredient.LastModified)
-	assert.Nil(createdIngredient.Deleted)
+	assert.NotEmpty(createdFood.Id)
+	assert.Equal(name, createdFood.Name)
+	assert.WithinDuration(time.Now(), *createdFood.Created, time.Duration(1_000_000_000))
+	assert.Nil(createdFood.LastModified)
+	assert.Nil(createdFood.Deleted)
 }
 
-func testUpdateIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
+func testUpdateFood(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.FoodRepository, t *testing.T) {
 	// seed data
 	id := "123"
 
-	query := "CREATE (:Ingredient {id: $id, name: $name, created: $created})"
+	query := "CREATE (:Food {id: $id, name: $name, created: $created})"
 	createdTime := time.Now()
 	params := map[string]any{
 		"id":      id,
-		"name":    "test ingredient",
+		"name":    "test food",
 		"created": neo4j.LocalDateTime(createdTime),
 	}
 
@@ -200,29 +200,29 @@ func testUpdateIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithCont
 	}
 
 	// test
-	ingredient := model.Ingredient{Id: id, Name: "test ingredient updated"}
-	updatedIngredient, err := repo.Update(ctx, ingredient)
+	food := model.Food{Id: id, Name: "test food updated"}
+	updatedFood, err := repo.Update(ctx, food)
 
 	// TODO make a direct Cypher query to verify anything about the state of the graph?
 
 	assert := assert.New(t)
 	assert.NoError(err)
-	assert.Equal(id, updatedIngredient.Id)
-	assert.Equal("test ingredient updated", updatedIngredient.Name)
-	assert.WithinDuration(createdTime, *updatedIngredient.Created, 0)
-	assert.True((*updatedIngredient.LastModified).After(createdTime))
-	assert.Nil(updatedIngredient.Deleted)
+	assert.Equal(id, updatedFood.Id)
+	assert.Equal("test food updated", updatedFood.Name)
+	assert.WithinDuration(createdTime, *updatedFood.Created, 0)
+	assert.True((*updatedFood.LastModified).After(createdTime))
+	assert.Nil(updatedFood.Deleted)
 }
 
-func testDeleteNoConnectionsIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
+func testDeleteNoConnectionsFood(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.FoodRepository, t *testing.T) {
 	// seed data
 	id := "123"
 
-	query := "CREATE (:Ingredient {id: $id, name: $name, created: $created})"
+	query := "CREATE (:Food {id: $id, name: $name, created: $created})"
 	createdTime := time.Now()
 	params := map[string]any{
 		"id":      id,
-		"name":    "test ingredient",
+		"name":    "test food",
 		"created": neo4j.LocalDateTime(createdTime),
 	}
 
@@ -245,16 +245,16 @@ func testDeleteNoConnectionsIngredient(ctx context.Context, neo4jDriver *neo4j.D
 	assert.Equal(id, deletedId)
 }
 
-func testDeleteWithConnectionsIngredient(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.IngredientRepository, t *testing.T) {
+func testDeleteWithConnectionsFood(ctx context.Context, neo4jDriver *neo4j.DriverWithContext, repo model.FoodRepository, t *testing.T) {
 	// seed data
 	id := "123"
 
 	// TODO an undeleted :CONTAINS_RELATIONSHIP pointing at the food to delete should cause an error
-	query := "CREATE (:Ingredient {id: $id, name: $name, created: $created})<-[:CONTAINS_INGREDIENT {created: $created}]-(:Recipe:Resource {created: $created})"
+	query := "CREATE (:Food {id: $id, name: $name, created: $created})<-[:CONTAINS_INGREDIENT {created: $created}]-(:Recipe:Resource {created: $created})"
 	createdTime := time.Now()
 	params := map[string]any{
 		"id":      id,
-		"name":    "test ingredient",
+		"name":    "test food",
 		"created": neo4j.LocalDateTime(createdTime),
 	}
 

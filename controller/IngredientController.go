@@ -11,43 +11,43 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type IngredientController struct {
-	ingredientRepository model.IngredientRepository
+type FoodController struct {
+	foodRepository model.FoodRepository
 }
 
-func NewIngredientController(ingredientRepository model.IngredientRepository) *IngredientController {
-	return &IngredientController{ingredientRepository: ingredientRepository}
+func NewFoodController(foodRepository model.FoodRepository) *FoodController {
+	return &FoodController{foodRepository: foodRepository}
 }
 
-func (rc *IngredientController) IngredientRoutes(router *mux.Router) {
-	ingredientRouter := router.PathPrefix("/ingredient").Subrouter()
+func (rc *FoodController) FoodRoutes(router *mux.Router) {
+	foodRouter := router.PathPrefix("/food").Subrouter()
 
 	// TODO search
-	ingredientRouter.HandleFunc("", rc.allIngredients).Methods("GET")
-	ingredientRouter.HandleFunc("/{id}", rc.getIngredient).Methods("GET")
-	ingredientRouter.HandleFunc("", rc.createIngredient).Methods("POST")
-	ingredientRouter.HandleFunc("/{id}", rc.replaceIngredient).Methods("PUT")
-	ingredientRouter.HandleFunc("/{id}", rc.updateIngredient).Methods("PATCH")
-	ingredientRouter.HandleFunc("/{id}", rc.deleteIngredient).Methods("DELETE")
+	foodRouter.HandleFunc("", rc.allFoods).Methods("GET")
+	foodRouter.HandleFunc("/{id}", rc.getFood).Methods("GET")
+	foodRouter.HandleFunc("", rc.createFood).Methods("POST")
+	foodRouter.HandleFunc("/{id}", rc.replaceFood).Methods("PUT")
+	foodRouter.HandleFunc("/{id}", rc.updateFood).Methods("PATCH")
+	foodRouter.HandleFunc("/{id}", rc.deleteFood).Methods("DELETE")
 }
 
-func (ic *IngredientController) allIngredients(w http.ResponseWriter, r *http.Request) {
-	ingredients, err := ic.ingredientRepository.GetAll(r.Context())
+func (ic *FoodController) allFoods(w http.ResponseWriter, r *http.Request) {
+	foods, err := ic.foodRepository.GetAll(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
 	// TODO pagination
-	response := response.GetIngredientsResponse{Ingredients: ingredients}
+	response := response.GetFoodsResponse{Foods: foods}
 	json.NewEncoder(w).Encode(response)
 }
 
-func (ic *IngredientController) getIngredient(w http.ResponseWriter, r *http.Request) {
+func (ic *FoodController) getFood(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	ingredient, found, err := ic.ingredientRepository.GetById(r.Context(), id)
+	food, found, err := ic.foodRepository.GetById(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -56,30 +56,30 @@ func (ic *IngredientController) getIngredient(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	json.NewEncoder(w).Encode(ingredient)
+	json.NewEncoder(w).Encode(food)
 }
 
-func (ic *IngredientController) createIngredient(w http.ResponseWriter, r *http.Request) {
-	var createIngredientRequest request.CreateIngredientRequest
-	json.NewDecoder(r.Body).Decode(&createIngredientRequest)
+func (ic *FoodController) createFood(w http.ResponseWriter, r *http.Request) {
+	var createFoodRequest request.CreateFoodRequest
+	json.NewDecoder(r.Body).Decode(&createFoodRequest)
 
-	var newIngredient model.Ingredient
-	newIngredient.Name = strings.TrimSpace(createIngredientRequest.Name)
+	var newFood model.Food
+	newFood.Name = strings.TrimSpace(createFoodRequest.Name)
 
-	ingredient, err := ic.ingredientRepository.Create(r.Context(), newIngredient)
+	food, err := ic.foodRepository.Create(r.Context(), newFood)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	json.NewEncoder(w).Encode(ingredient)
+	json.NewEncoder(w).Encode(food)
 }
 
-func (ic *IngredientController) replaceIngredient(w http.ResponseWriter, r *http.Request) {
+func (ic *FoodController) replaceFood(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	ingredient, found, err := ic.ingredientRepository.GetById(r.Context(), id)
+	food, found, err := ic.foodRepository.GetById(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -88,25 +88,25 @@ func (ic *IngredientController) replaceIngredient(w http.ResponseWriter, r *http
 		return
 	}
 
-	var replaceIngredientRequest request.CreateIngredientRequest
-	json.NewDecoder(r.Body).Decode(&replaceIngredientRequest)
+	var replaceFoodRequest request.CreateFoodRequest
+	json.NewDecoder(r.Body).Decode(&replaceFoodRequest)
 
-	ingredient.Name = strings.TrimSpace(replaceIngredientRequest.Name)
+	food.Name = strings.TrimSpace(replaceFoodRequest.Name)
 
-	updatedIngredient, err := ic.ingredientRepository.Update(r.Context(), *ingredient)
+	updatedFood, err := ic.foodRepository.Update(r.Context(), *food)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	json.NewEncoder(w).Encode(updatedIngredient)
+	json.NewEncoder(w).Encode(updatedFood)
 }
 
-func (ic *IngredientController) updateIngredient(w http.ResponseWriter, r *http.Request) {
+func (ic *FoodController) updateFood(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	ingredient, found, err := ic.ingredientRepository.GetById(r.Context(), id)
+	food, found, err := ic.foodRepository.GetById(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -115,27 +115,27 @@ func (ic *IngredientController) updateIngredient(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var replaceIngredientRequest request.UpdateIngredientRequest
-	json.NewDecoder(r.Body).Decode(&replaceIngredientRequest)
+	var replaceFoodRequest request.UpdateFoodRequest
+	json.NewDecoder(r.Body).Decode(&replaceFoodRequest)
 
-	if replaceIngredientRequest.Name != nil {
-		ingredient.Name = strings.TrimSpace(*replaceIngredientRequest.Name)
+	if replaceFoodRequest.Name != nil {
+		food.Name = strings.TrimSpace(*replaceFoodRequest.Name)
 	}
 
-	updatedIngredient, err := ic.ingredientRepository.Update(r.Context(), *ingredient)
+	updatedFood, err := ic.foodRepository.Update(r.Context(), *food)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	json.NewEncoder(w).Encode(updatedIngredient)
+	json.NewEncoder(w).Encode(updatedFood)
 }
 
-func (ic *IngredientController) deleteIngredient(w http.ResponseWriter, r *http.Request) {
+func (ic *FoodController) deleteFood(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	ingredient, found, err := ic.ingredientRepository.GetById(r.Context(), id)
+	food, found, err := ic.foodRepository.GetById(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -144,12 +144,12 @@ func (ic *IngredientController) deleteIngredient(w http.ResponseWriter, r *http.
 		return
 	}
 
-	deletedId, err := ic.ingredientRepository.Delete(r.Context(), ingredient.Id)
+	deletedId, err := ic.foodRepository.Delete(r.Context(), food.Id)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	deleteIngredientResponse := response.DeleteIngredientResponse{Id: deletedId}
-	json.NewEncoder(w).Encode(deleteIngredientResponse)
+	deleteFoodResponse := response.DeleteFoodResponse{Id: deletedId}
+	json.NewEncoder(w).Encode(deleteFoodResponse)
 }
