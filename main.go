@@ -7,7 +7,8 @@ import (
 
 	"github.com/ThomasMatlak/food/controller"
 	"github.com/ThomasMatlak/food/repository"
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
@@ -32,24 +33,23 @@ func main() {
 	foodRepository := repository.NewFoodRepository(driver)
 	foodController := controller.NewFoodController(foodRepository)
 
-	router := mux.NewRouter().StrictSlash(true)
+	router := chi.NewRouter()
+	router.Use(middleware.RequestID)
+	router.Use(middleware.RealIP)
+	router.Use(middleware.Logger)
+	router.Use(middleware.Recoverer)
+	router.Use(middleware.StripSlashes)
 
 	recipeController.RecipeRoutes(router)
 	foodController.FoodRoutes(router)
 
-	router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-		pathTemplate, err := route.GetPathTemplate()
-		if err == nil {
-			fmt.Println(pathTemplate)
-		}
-
-		methods, err := route.GetMethods()
-		if err == nil {
-			fmt.Println(methods)
-		}
-
+	err = chi.Walk(router, func(method, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		fmt.Printf("%s %s\n", method, route)
 		return nil
 	})
+	if err != nil {
+		panic(err)
+	}
 
 	http.ListenAndServe(":8080", router)
 }

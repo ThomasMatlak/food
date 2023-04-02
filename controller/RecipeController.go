@@ -8,7 +8,7 @@ import (
 	"github.com/ThomasMatlak/food/controller/request"
 	"github.com/ThomasMatlak/food/controller/response"
 	"github.com/ThomasMatlak/food/model"
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 type RecipeController struct {
@@ -19,16 +19,19 @@ func NewRecipeController(recipeRepository model.RecipeRepository) *RecipeControl
 	return &RecipeController{recipeRepository: recipeRepository}
 }
 
-func (rc *RecipeController) RecipeRoutes(router *mux.Router) {
-	recipeRouter := router.PathPrefix("/recipe").Subrouter()
+func (rc *RecipeController) RecipeRoutes(router *chi.Mux) {
+	router.Route("/recipe", func(r chi.Router) {
+		// TODO search
+		r.Post("/", rc.createRecipe)
+		r.Get("/", rc.allRecipes)
 
-	// TODO search
-	recipeRouter.HandleFunc("", rc.allRecipes).Methods("GET")
-	recipeRouter.HandleFunc("/{id}", rc.getRecipe).Methods("GET")
-	recipeRouter.HandleFunc("", rc.createRecipe).Methods("POST")
-	recipeRouter.HandleFunc("/{id}", rc.replaceRecipe).Methods("PUT")
-	recipeRouter.HandleFunc("/{id}", rc.updateRecipe).Methods("PATCH")
-	recipeRouter.HandleFunc("/{id}", rc.deleteRecipe).Methods("DELETE")
+		r.Route("/{id}", func(r chi.Router) {
+			r.Get("/", rc.getRecipe)
+			r.Put("/", rc.replaceRecipe)
+			r.Patch("/", rc.updateRecipe)
+			r.Delete("/", rc.deleteRecipe)
+		})
+	})
 }
 
 func (rc *RecipeController) allRecipes(w http.ResponseWriter, r *http.Request) {
@@ -45,9 +48,7 @@ func (rc *RecipeController) allRecipes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rc *RecipeController) getRecipe(w http.ResponseWriter, r *http.Request) {
-
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := chi.URLParam(r, "id")
 
 	recipe, found, err := rc.recipeRepository.GetById(r.Context(), id)
 	if err != nil {
@@ -89,8 +90,7 @@ func (rc *RecipeController) createRecipe(w http.ResponseWriter, r *http.Request)
 }
 
 func (rc *RecipeController) replaceRecipe(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := chi.URLParam(r, "id")
 
 	recipe, found, err := rc.recipeRepository.GetById(r.Context(), id)
 	if err != nil {
@@ -128,8 +128,7 @@ func (rc *RecipeController) replaceRecipe(w http.ResponseWriter, r *http.Request
 }
 
 func (rc *RecipeController) updateRecipe(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := chi.URLParam(r, "id")
 
 	recipe, found, err := rc.recipeRepository.GetById(r.Context(), id)
 	if err != nil {
@@ -174,8 +173,7 @@ func (rc *RecipeController) updateRecipe(w http.ResponseWriter, r *http.Request)
 }
 
 func (rc *RecipeController) deleteRecipe(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := chi.URLParam(r, "id")
 
 	recipe, found, err := rc.recipeRepository.GetById(r.Context(), id)
 	if err != nil {
