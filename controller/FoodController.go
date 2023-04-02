@@ -8,7 +8,7 @@ import (
 	"github.com/ThomasMatlak/food/controller/request"
 	"github.com/ThomasMatlak/food/controller/response"
 	"github.com/ThomasMatlak/food/model"
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 type FoodController struct {
@@ -19,16 +19,19 @@ func NewFoodController(foodRepository model.FoodRepository) *FoodController {
 	return &FoodController{foodRepository: foodRepository}
 }
 
-func (rc *FoodController) FoodRoutes(router *mux.Router) {
-	foodRouter := router.PathPrefix("/food").Subrouter()
+func (rc *FoodController) FoodRoutes(router chi.Router) {
+	router.Route("/food", func(r chi.Router) {
+		// TODO search
+		r.Post("/", rc.createFood)
+		r.Get("/", rc.allFoods)
 
-	// TODO search
-	foodRouter.HandleFunc("", rc.allFoods).Methods("GET")
-	foodRouter.HandleFunc("/{id}", rc.getFood).Methods("GET")
-	foodRouter.HandleFunc("", rc.createFood).Methods("POST")
-	foodRouter.HandleFunc("/{id}", rc.replaceFood).Methods("PUT")
-	foodRouter.HandleFunc("/{id}", rc.updateFood).Methods("PATCH")
-	foodRouter.HandleFunc("/{id}", rc.deleteFood).Methods("DELETE")
+		r.Route("/{id}", func(r chi.Router) {
+			r.Get("/", rc.getFood)
+			r.Put("/", rc.replaceFood)
+			r.Patch("/", rc.updateFood)
+			r.Delete("/", rc.deleteFood)
+		})
+	})
 }
 
 func (ic *FoodController) allFoods(w http.ResponseWriter, r *http.Request) {
@@ -44,8 +47,7 @@ func (ic *FoodController) allFoods(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ic *FoodController) getFood(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := chi.URLParam(r, "id")
 
 	food, found, err := ic.foodRepository.GetById(r.Context(), id)
 	if err != nil {
@@ -76,8 +78,7 @@ func (ic *FoodController) createFood(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ic *FoodController) replaceFood(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := chi.URLParam(r, "id")
 
 	food, found, err := ic.foodRepository.GetById(r.Context(), id)
 	if err != nil {
@@ -103,8 +104,7 @@ func (ic *FoodController) replaceFood(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ic *FoodController) updateFood(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := chi.URLParam(r, "id")
 
 	food, found, err := ic.foodRepository.GetById(r.Context(), id)
 	if err != nil {
@@ -132,8 +132,7 @@ func (ic *FoodController) updateFood(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ic *FoodController) deleteFood(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := chi.URLParam(r, "id")
 
 	food, found, err := ic.foodRepository.GetById(r.Context(), id)
 	if err != nil {
