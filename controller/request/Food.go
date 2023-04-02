@@ -1,9 +1,9 @@
 package request
 
-type CreateIngredientRequest struct {
+type CreateFoodRequest struct {
 	Name string `json:"name"`
 }
 
-type UpdateIngredientRequest struct {
+type UpdateFoodRequest struct {
 	Name *string `json:"name"`
 }

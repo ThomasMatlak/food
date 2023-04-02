@@ -12,20 +12,20 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 )
 
-type IngredientRepository struct {
+type FoodRepository struct {
 	driver neo4j.DriverWithContext // TODO *neo4j.DriverWithContext?
 }
 
-func NewIngredientRepository(driver neo4j.DriverWithContext) *IngredientRepository {
-	return &IngredientRepository{driver: driver}
+func NewFoodRepository(driver neo4j.DriverWithContext) *FoodRepository {
+	return &FoodRepository{driver: driver}
 }
 
-func (r *IngredientRepository) GetAll(ctx context.Context) ([]model.Ingredient, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) ([]model.Ingredient, error) {
-		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Ingredient, error) {
+func (r *FoodRepository) GetAll(ctx context.Context) ([]model.Food, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) ([]model.Food, error) {
+		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) ([]model.Food, error) {
 			*query = fmt.Sprintf("MATCH (i:`%s`) WHERE i.deleted IS NULL\n"+
 				"RETURN i",
-				IngredientLabel)
+				FoodLabel)
 			params = map[string]any{}
 
 			result, err := tx.Run(ctx, *query, params)
@@ -38,7 +38,7 @@ func (r *IngredientRepository) GetAll(ctx context.Context) ([]model.Ingredient, 
 				return nil, err
 			}
 
-			ingredients := make([]model.Ingredient, len(records))
+			foods := make([]model.Food, len(records))
 
 			for i := 0; i < len(records); i++ {
 				node, found := TypedGet[neo4j.Node](records[i], "i")
@@ -47,27 +47,27 @@ func (r *IngredientRepository) GetAll(ctx context.Context) ([]model.Ingredient, 
 					continue
 				}
 
-				ingredient, err := ParseIngredientNode(node)
+				food, err := ParseFoodNode(node)
 				if err != nil {
 					return nil, err
 				}
 
-				ingredients[i] = *ingredient
+				foods[i] = *food
 			}
 
-			return ingredients, nil
+			return foods, nil
 		})
 	}
 
-	return RunQuery(ctx, r.driver, "get all ingredients", neo4j.AccessModeRead, work)
+	return RunQuery(ctx, r.driver, "get all foods", neo4j.AccessModeRead, work)
 }
 
-func (r *IngredientRepository) GetById(ctx context.Context, id string) (*model.Ingredient, bool, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Ingredient, error) {
-		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
+func (r *FoodRepository) GetById(ctx context.Context, id string) (*model.Food, bool, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Food, error) {
+		return neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Food, error) {
 			*query = fmt.Sprintf("%s WHERE i.deleted IS NULL\n"+
 				"RETURN i",
-				MatchNodeById("i", []string{IngredientLabel}))
+				MatchNodeById("i", []string{FoodLabel}))
 			params = map[string]any{
 				"iId": id,
 			}
@@ -82,11 +82,11 @@ func (r *IngredientRepository) GetById(ctx context.Context, id string) (*model.I
 				return nil, fmt.Errorf("could not find column i")
 			}
 
-			return ParseIngredientNode(node)
+			return ParseFoodNode(node)
 		})
 	}
 
-	ingredient, err := RunQuery(ctx, r.driver, "get ingredient", neo4j.AccessModeRead, work)
+	food, err := RunQuery(ctx, r.driver, "get food", neo4j.AccessModeRead, work)
 
 	if err != nil && err.Error() == "Result contains no more records" {
 		return nil, false, nil
@@ -95,13 +95,13 @@ func (r *IngredientRepository) GetById(ctx context.Context, id string) (*model.I
 		return nil, false, err
 	}
 
-	return ingredient, true, nil
+	return food, true, nil
 }
 
-func (r *IngredientRepository) Create(ctx context.Context, ingredient model.Ingredient) (*model.Ingredient, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Ingredient, error) {
-		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
-			labels := []string{IngredientLabel, ResourceLabel}
+func (r *FoodRepository) Create(ctx context.Context, food model.Food) (*model.Food, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Food, error) {
+		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Food, error) {
+			labels := []string{FoodLabel, ResourceLabel}
 			id, err := model.ResourceId(labels)
 			if err != nil {
 				return nil, err
@@ -112,7 +112,7 @@ func (r *IngredientRepository) Create(ctx context.Context, ingredient model.Ingr
 				strings.Join(labels, "`:`"))
 			params = map[string]any{
 				"id":      id,
-				"name":    ingredient.Name,
+				"name":    food.Name,
 				"created": neo4j.LocalDateTime(time.Now()),
 			}
 
@@ -126,22 +126,22 @@ func (r *IngredientRepository) Create(ctx context.Context, ingredient model.Ingr
 				return nil, fmt.Errorf("could not find column i")
 			}
 
-			return ParseIngredientNode(node)
+			return ParseFoodNode(node)
 		})
 	}
 
-	return RunQuery(ctx, r.driver, "create ingredient", neo4j.AccessModeWrite, work)
+	return RunQuery(ctx, r.driver, "create food", neo4j.AccessModeWrite, work)
 }
 
-func (r *IngredientRepository) Update(ctx context.Context, ingredient model.Ingredient) (*model.Ingredient, error) {
-	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Ingredient, error) {
-		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Ingredient, error) {
+func (r *FoodRepository) Update(ctx context.Context, food model.Food) (*model.Food, error) {
+	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (*model.Food, error) {
+		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (*model.Food, error) {
 			*query = fmt.Sprintf("%s SET i += {name: $name, lastModified: $lastModified}\n"+
 				"RETURN i",
-				MatchNodeById("i", []string{IngredientLabel}))
+				MatchNodeById("i", []string{FoodLabel}))
 			params = map[string]any{
-				"iId":          ingredient.Id,
-				"name":         ingredient.Name,
+				"iId":          food.Id,
+				"name":         food.Name,
 				"lastModified": neo4j.LocalDateTime(time.Now()),
 			}
 
@@ -155,20 +155,20 @@ func (r *IngredientRepository) Update(ctx context.Context, ingredient model.Ingr
 				return nil, fmt.Errorf("could not find column i")
 			}
 
-			return ParseIngredientNode(node)
+			return ParseFoodNode(node)
 		})
 	}
 
-	return RunQuery(ctx, r.driver, "update ingredient", neo4j.AccessModeWrite, work)
+	return RunQuery(ctx, r.driver, "update food", neo4j.AccessModeWrite, work)
 }
 
-func (r *IngredientRepository) Delete(ctx context.Context, id string) (string, error) {
+func (r *FoodRepository) Delete(ctx context.Context, id string) (string, error) {
 	work := func(ctx context.Context, session neo4j.SessionWithContext, query *string, params map[string]any) (string, error) {
 		return neo4j.ExecuteWrite(ctx, session, func(tx neo4j.ManagedTransaction) (string, error) {
 			*query = fmt.Sprintf("%s OPTIONAL MATCH (i)-[rel]-(:`%s`) WHERE rel.deleted IS NULL\n"+
 				"SET i.deleted = $deleted, rel.deleted = $deleted\n"+
 				"RETURN i.id AS id",
-				MatchNodeById("i", []string{IngredientLabel}), ResourceLabel)
+				MatchNodeById("i", []string{FoodLabel}), ResourceLabel)
 			params = map[string]any{
 				"iId":     id,
 				"deleted": neo4j.LocalDateTime(time.Now()),
@@ -188,10 +188,10 @@ func (r *IngredientRepository) Delete(ctx context.Context, id string) (string, e
 		})
 	}
 
-	return RunQuery(ctx, r.driver, "delete ingredient", neo4j.AccessModeWrite, work)
+	return RunQuery(ctx, r.driver, "delete food", neo4j.AccessModeWrite, work)
 }
 
-func ParseIngredientNode(node dbtype.Node) (*model.Ingredient, error) {
+func ParseFoodNode(node dbtype.Node) (*model.Food, error) {
 	id, err := neo4j.GetProperty[string](node, "id")
 	if err != nil {
 		return nil, err
@@ -207,5 +207,5 @@ func ParseIngredientNode(node dbtype.Node) (*model.Ingredient, error) {
 		return nil, err
 	}
 
-	return &model.Ingredient{Id: id, Name: name, Resource: *resource}, nil
+	return &model.Food{Id: id, Name: name, Resource: *resource}, nil
 }
