@@ -1,0 +1,68 @@
+package response
+
+import "fmt"
+
+import "github.com/ThomasMatlak/food/model"
+
+templ header() {
+<head>
+	<title>Cool Reccipe Website</title>
+	<script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
+</head>
+}
+
+templ ViewFoods(foods []model.Food) {
+@header()
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody hx-confirm="Are you sure?" hx-target="closest tr" hx-swap="outerHTML swap:1s">
+	for _, food := range foods {
+		<tr>
+			<td><a href={templ.URL(fmt.Sprintf("/food/%s", food.Id))}>{food.Name}</a></td>
+			<td>
+				<button hx-delete={fmt.Sprintf("/food/%s", food.Id)}>
+					Delete
+				</button>
+			</td>
+		</tr>
+	}
+  </tbody>
+</table>
+}
+
+templ CreateFood() {
+@header()
+<form action="/food" method="post">
+	<label for="name">Food Name:</label>
+	<input type="text" name="name" id="name" required/>
+	<input type="submit" value="Create Food"/>
+</form>
+}
+
+templ GetFood (food *model.Food) {
+@header()
+<div hx-target="this" hx-swap="outerHTML">
+    <div><label>Id</label>: {food.Id}</div>
+    <div><label>Name</label>: {food.Name}</div>
+    <button hx-get={fmt.Sprintf("/food/%s/edit", food.Id)}>
+    Click To Edit
+    </button>
+</div>
+}
+
+templ EditFoodForm(food *model.Food) {
+<form hx-put={fmt.Sprintf("/food/%s", food.Id)} hx-target="this" hx-swap="outerHTML">
+	<div><label>Id</label>: {food.Id}</div>
+	<div>
+		<label>Name</label>
+		<input type="text" name="name" value={food.Name}/>
+	</div>
+	<button>Submit</button>
+	<button hx-get={fmt.Sprintf("/food/%s", food.Id)}>Cancel</button>
+</form>
+}

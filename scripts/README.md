@@ -5,8 +5,8 @@
 ```bash
 > mkdir data
 > cd data
-> wget https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_csv_2022-10-28.zip
-> unzip FoodData_Central_csv_2022-10-28.zip
+> wget https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_csv_2023-10-26.zip
+> unzip FoodData_Central_csv_2023-10-26.zip
 # TODO remove duplicates and fix badly formed rows
 > gzip food.csv food_nutrient.csv nutrient.csv
 ```
